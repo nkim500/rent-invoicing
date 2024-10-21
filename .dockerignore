@@ -1,0 +1,16 @@
+.git
+.vscode
+.dockerignore
+.env
+.*ignore
+docker-compose*.yml
+Dockerfile*
+Makefile
+README.md
+.venv
+.venv/
+data
+data/
+test
+test/
+requirements-dev.txt

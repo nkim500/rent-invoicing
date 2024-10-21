@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  billing_db:
+    container_name: billing_db
+    image: postgis/postgis:latest
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - db_volume:/var/lib/postgresql/data
+
+  billing_service:
+    image: billing-service:dev
+    container_name: billing_service
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    depends_on:
+      - billing_db
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+
+  billing_console:
+    image: billing-console:dev
+    container_name: billing_console
+    build:
+      context: .
+      dockerfile: webapp/Dockerfile
+    depends_on:
+      - billing_service
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+
+volumes:
+  db_volume:

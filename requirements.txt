@@ -1,0 +1,9 @@
+-r requirements-dev.txt
+
+fastapi[standard]==0.114.0
+loguru==0.7.2
+psycopg2==2.9.9
+pydantic==2.8.2
+pydantic-settings==2.4.0
+sqlmodel==0.0.20
+streamlit==1.37.1
