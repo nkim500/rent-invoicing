@@ -175,6 +175,3 @@ data/
 *.numbers
 *.xlsx
 template/*
-
-# dev
-requirements-dev.txt
