@@ -172,6 +172,3 @@ cython_debug/
 data/*
 data/
 *db_data*
-*.numbers
-*.xlsx
-template/*
