@@ -347,7 +347,7 @@ def serialize_invoice_input_data_row(
     if row[12]:
         parsed["desc_other_rent"] = "Other rent(s)*"
         parsed["date_other_rent"] = statement_date
-        parsed["detail_other_rent"] = "" ### SOME DETAILS ABOUT THE OTHER RENT NEEDS TO GO HERE
+        parsed["detail_other_rent"] = f"* Other rents include: {row[23]}"
     else:
         parsed["desc_other_rent"] = None
         parsed["date_other_rent"] = None

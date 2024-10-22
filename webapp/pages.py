@@ -502,34 +502,22 @@ def generate_invoices_page():
         st.info("Invoice for this statement date already in DB")
 
     w_check = api.get_water_usages_for_statement_date(statement_date)
-    if not w_check:
-        st.error("Water readings not found in DB for this statement date")
-    else:
+    if w_check:
         st.success("Water readings in DB for this statement date")
+    else:
+        st.error("Water readings not found in DB for this statement date")
     
     s_check = api.get_storages_for_statement_date(statement_date)
-    if not s_check:
-        st.error("Storages not found in DB For this statement_date")
+    if s_check:
+        st.success("Storages in DB for this statement date")
     else:
-        try:
-            if s_check["details"] == "Not Found":
-                st.error("Storages not found in DB For this statement_date")
-            else:
-                st.success("Storages in DB for this statement date")
-        except KeyError or TypeError:
-            st.success("Storages in DB for this statement date")
+        st.error("Storages not found in DB For this statement_date")
 
     r_check = api.get_rents_for_statement_date(statement_date)
-    if not r_check:
-        st.error("Rents not found in DB for this statement date")
+    if r_check:
+        st.success("Rents in DB for this statement date")
     else:
-        try:
-            if r_check["details"] == "Not Found":
-                st.error("Rents not found in DB For this statement_date")
-            else:
-                st.success("Rents in DB for this statement date")
-        except KeyError or TypeError:
-            st.success("Rents in DB for this statement date")
+        st.error("Rents not found in DB for this statement date")
 
     o_check = api.get_other_rent_receivables(statement_date)
     if o_check:
@@ -544,6 +532,7 @@ def generate_invoices_page():
     st.session_state.upload_invoice_to_db = st.checkbox("Update database", value=True)
 
     if st.session_state.generate_invoices:
+        utils.clear_directory(export_path)
         try:
             raw = api.get_invoice_data(
                 statement_date=statement_date,
@@ -563,11 +552,12 @@ def generate_invoices_page():
             export_path=export_path,
         )
         st.write(f"Generated {len(file_paths)} invoice(s)")
-        if utils.user_download_invoice_zip(export_path):
-            st.session_state.download_triggered = True
-        if st.session_state.download_triggered:
-            utils.clear_directory(export_path)
-            st.session_state.download_triggered = False
+        utils.user_download_invoice_zip(export_path)
+        # if utils.user_download_invoice_zip(export_path):
+            # st.session_state.download_triggered = True
+        # if st.session_state.download_triggered:
+            # utils.clear_directory(export_path)
+            # st.session_state.download_triggered = False
 
 
 def accounts_management_page():
@@ -594,13 +584,6 @@ def accounts_management_page():
             st.session_state.chg_acct_deet_trigger = False
         if "tenant_submitted" not in st.session_state:
             st.session_state.tenant_submitted = False
-        
-#     # Invoice Settings Modification Section
-#     st.header("Modify Invoice Settings")
-#     rent_rate = st.number_input("Default Rent Monthly Rate", min_value=0.0)
-#     water_rate = st.number_input("Default Water Monthly Rate", min_value=0.0)
-#     service_fee = st.number_input("Default Water Service Fee", min_value=0.0)
-#     storage_rate = st.number_input("Default Storage Monthly Rate", min_value=0.0)
 
     _initialize_state()
     st.subheader("Add a new invoice setting")

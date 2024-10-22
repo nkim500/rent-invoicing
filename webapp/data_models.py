@@ -274,7 +274,6 @@ class BillPreference(str, Enum):
     NO_PREFENCE = 'NO_PREFENCE'
 
 
-
 class Account(BaseModel):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     lot_id: Optional[str] = Field(foreign_key='lots.id')

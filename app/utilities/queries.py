@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from uuid import UUID
 
-from sqlalchemy import Select, not_, or_
+from sqlalchemy import Select, not_, or_, text
 from sqlalchemy import Update
 from sqlalchemy import desc
 from sqlalchemy import func
@@ -405,6 +405,17 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
         .scalar_subquery()
     )
 
+    notes_subquery = (
+        select(
+            text("array_to_string(array_agg(details->>'note'), '; ')")
+        ).where(
+            models.AccountsReceivable.account_id == models.Account.id,
+            models.AccountsReceivable.charge_type == models.ChargeTypes.OTHER,
+            models.AccountsReceivable.paid.is_(False),
+            models.AccountsReceivable.statement_date == statement_date
+        ).scalar_subquery()
+    )
+
     query = (
         select(
             literal(statement_date).label("statement_date"),  # 0
@@ -455,7 +466,8 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
             models.WaterUsage.previous_date.label("previous_water_date"),
             models.WaterMeter.id.label("water_meter_id"),  # 20
             previous_month_late_fee_post_payments_subquery.label("late_fee"),
-            invoice_setting_subquery.c.id
+            invoice_setting_subquery.c.id,
+            notes_subquery.label("other_rents_notes")
         )
         .outerjoin_from(models.Account, models.Lot, models.Account.lot_id == models.Lot.id)
         .join_from(models.Account, models.Tenant, models.Account.account_holder == models.Tenant.id)

@@ -381,4 +381,9 @@ class Invoice(SQLModel, table=True):
 
     @field_serializer('invoice_date', 'statement_date', 'inserted_at', 'delivered_on')
     def serialize_date(self, v: date | datetime, _info):
-        return v.isoformat()
+        if v is None:
+            return v
+        elif isinstance(v, str):
+            return v
+        else:
+            return v.isoformat()

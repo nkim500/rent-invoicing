@@ -4,6 +4,7 @@ import re
 import shutil
 from datetime import date, datetime
 from io import BytesIO
+import time
 
 
 import pandas as pd
@@ -14,8 +15,6 @@ from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 import data_models as models
-# from spire.xls import Workbook as SpireWorkbook
-# from spire.xls import FileFormat
 
 def statement_date_widget() -> date:
     st.sidebar.write("Select the statement date to work on:")
@@ -213,10 +212,6 @@ def duplicate_accounts_receivable_entry_check(
     new_receivables: list[models.AccountsReceivable],
     existing_receivables: list[models.AccountsReceivable]
 ) -> bool:
-    # existing_receivable_objs = [
-    #     models.AccountsReceivable(**receivable) for receivable in existing_receivables
-    # ]
-
     # Iterate over each new payment and check for duplicates
     for new_receivable in new_receivables:
         for existing_receivable in existing_receivables:
@@ -251,21 +246,6 @@ def remove_empty_rows(ws: Worksheet) -> Worksheet:
     return ws
 
 
-# def generate_pdf(export_file_path: str):
-#     workbook = SpireWorkbook()
-#     workbook.LoadFromFile(export_file_path)
-#     for sheet in workbook.Worksheets:
-#         pageSetup = sheet.PageSetup
-#         pageSetup.TopMargin = 0.3
-#         pageSetup.BottomMargin = 0.3
-#         pageSetup.LeftMargin = 0.3
-#         pageSetup.RightMargin = 0.3
-#     workbook.ConverterSetting.SheetFitToPage = True
-#     pdf_export_path = export_file_path.replace(".xlsx", ".pdf")
-#     workbook.SaveToFile(pdf_export_path, FileFormat.PDF)
-#     workbook.Dispose()
-
-
 def generate_invoices(
     template_path: str,
     input_data: list[models.InvoiceFileParse],
@@ -283,8 +263,6 @@ def generate_invoices(
         export_file_paths.append(export_file_path)
         wb.save(export_file_path)
         wb.close()
-        # if pdf:
-            # generate_pdf(export_file_path)
     return export_file_paths
             
 
@@ -364,14 +342,13 @@ def user_download_invoice_zip(file_dir: str):
         file_name="all_reports.zip",
         mime="application/zip"
     )
+    zip_buffer.close()
 
 
 def clear_directory(file_dir: str):
     # Loop through all files in the directory and remove them
     for filename in os.listdir(file_dir):
-        st.write(filename)
         file_path = os.path.join(file_dir, filename)
-        st.write(file_path)
         try:
             if os.path.isfile(file_path) or os.path.islink(file_path):
                 os.unlink(file_path)

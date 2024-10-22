@@ -192,19 +192,19 @@ def get_other_rent_receivables(
         params=params
     )
     receivables = json.loads(response.content)
-    if receivables:
-        receivable_objects = [
-            models.AccountsReceivable(
-                id=item["id"],
-                account_id=item["account_id"],
-                amount_due=item["amount_due"],
-                statement_date=item["statement_date"],
-                charge_type=models.ChargeTypes.OTHER,
-                paid=item["paid"],
-                details=item["details"],
-                inserted_at=item["inserted_at"]
-            ) for item in receivables
-        ]
+
+    receivable_objects = [
+        models.AccountsReceivable(
+            id=item["id"],
+            account_id=item["account_id"],
+            amount_due=item["amount_due"],
+            statement_date=item["statement_date"],
+            charge_type=models.ChargeTypes.OTHER,
+            paid=item["paid"],
+            details=item["details"],
+            inserted_at=item["inserted_at"]
+        ) for item in receivables
+    ] if receivables else receivables
 
     return receivable_objects
 
