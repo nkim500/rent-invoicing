@@ -126,7 +126,7 @@ def manage_payments_page():
 
 
     #
-    st.subheader("Record new payments to DB:")
+    st.subheader("Record New Payments:")
     if st.checkbox("Select to record new payments"):
         if st.button("Add more input field"):
             st.session_state.input_count += 1
@@ -222,7 +222,7 @@ def manage_payments_page():
                 )
     
     #
-    st.subheader("Process payments")
+    st.subheader("Process Payments")
     if st.button("Apply available payments to outstanding receivables"):
         if st.session_state.processing_date:
             st.write(st.session_state.processing_date)
@@ -553,11 +553,6 @@ def generate_invoices_page():
         )
         st.write(f"Generated {len(file_paths)} invoice(s)")
         utils.user_download_invoice_zip(export_path)
-        # if utils.user_download_invoice_zip(export_path):
-            # st.session_state.download_triggered = True
-        # if st.session_state.download_triggered:
-            # utils.clear_directory(export_path)
-            # st.session_state.download_triggered = False
 
 
 def accounts_management_page():

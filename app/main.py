@@ -1,6 +1,6 @@
 from collections import defaultdict
 from fastapi import FastAPI, HTTPException, Query
-from sqlmodel import Session, create_engine
+from sqlmodel import Session, create_engine, SQLModel
 
 from datetime import date, timedelta
 from fastapi import Depends
@@ -17,17 +17,22 @@ from utilities.data_transformation import incur_late_fee
 from utilities.data_transformation import process_accounts_receivables
 from utilities.data_transformation import serialize_invoice_input_data_row
 
+logger = get_logger()
+db_cfg = DBConfigs()
+uri = build_connection_string(db_cfg)
+engine = create_engine(uri)
 app = FastAPI()
 
+
+@app.lifespan
+def on_startup(app: FastAPI):    
+    SQLModel.metadata.create_all(bind=engine, checkfirst=True)
+    yield
+
+
 def get_session():
-    db_cfg = DBConfigs()
-    uri = build_connection_string(db_cfg)
-    engine = create_engine(uri)
     with Session(engine) as session:
         yield session
-
-
-logger = get_logger()
 
 
 @app.post('/watermeter')
