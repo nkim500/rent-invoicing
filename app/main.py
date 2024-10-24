@@ -24,10 +24,9 @@ engine = create_engine(uri)
 app = FastAPI()
 
 
-@app.lifespan
-def on_startup(app: FastAPI):    
+@app.on_event('startup')
+def on_startup():    
     SQLModel.metadata.create_all(bind=engine, checkfirst=True)
-    yield
 
 
 def get_session():

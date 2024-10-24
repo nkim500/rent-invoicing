@@ -93,7 +93,7 @@ After the above steps, if initializing via Python, relationships between entitie
 - If any, values in **rental rate override** attribute of **Accounts** will take precedent over the default monthly rent in the invoice settings for monthly rent calculation.
 
 ### Manage Payments
-![payments page](https://private-user-images.githubusercontent.com/86082214/379459514-a76a8b73-ed0e-4f6b-93dd-c6cf380843fd.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3Mjk3MTcxNDMsIm5iZiI6MTcyOTcxNjg0MywicGF0aCI6Ii84NjA4MjIxNC8zNzk0NTk1MTQtYTc2YThiNzMtZWQwZS00ZjZiLTkzZGQtYzZjZjM4MDg0M2ZkLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDEwMjMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQxMDIzVDIwNTQwM1omWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTgxY2IwOTllZmQ0ZTRjNWRjNGRmN2Y1OWY3ZDFmZDY0OGMyZjBiNzg4ZTVjNmYzZjc0M2YwOWFiMDExMTdiZTQmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.OknACKo4EVbDS8wHzEkGZsHcaDhHW0T57gOqbgt4CkI)
+![payments page](https://github.com/user-attachments/assets/9fc38706-c672-4b9d-9954-62e06e9180ae)
 #### View Recent Payments
 
 - Check the box labeled "See recently uploaded payments" to view payments.
