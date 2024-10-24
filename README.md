@@ -93,7 +93,7 @@ After the above steps, if initializing via Python, relationships between entitie
 - If any, values in **rental rate override** attribute of **Accounts** will take precedent over the default monthly rent in the invoice settings for monthly rent calculation.
 
 ### Manage Payments
-![payments page](https://github.com/user-attachments/assets/9fc38706-c672-4b9d-9954-62e06e9180ae)
+![payments page](https://i.imgur.com/87reYE7.png)
 #### View Recent Payments
 
 - Check the box labeled "See recently uploaded payments" to view payments.
@@ -114,7 +114,7 @@ After the above steps, if initializing via Python, relationships between entitie
 - Use the "Process payments" button to use available payments for outstanding receivables.
 
 ### Manage Receivables
-![receivables page](https://private-user-images.githubusercontent.com/86082214/379459923-bc8442a2-81b9-4030-9de2-a91d75f7a442.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3Mjk3MTcwODMsIm5iZiI6MTcyOTcxNjc4MywicGF0aCI6Ii84NjA4MjIxNC8zNzk0NTk5MjMtYmM4NDQyYTItODFiOS00MDMwLTlkZTItYTkxZDc1ZjdhNDQyLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDEwMjMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQxMDIzVDIwNTMwM1omWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTY3NGM1ZDY2ZTgxNTdkOWQ4MzJhNjdhOWVkOTA1NDY2YTU5Zjg5OTI5NDZmZjhkZGM4OWE1NTI2ZDUyOTNlNDImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.S_sRv_kJDF_bcPVYRiJJVQDzpTOcs9WPS59eAVx_H94)
+![receivables page](https://imgur.com/mDkWtyl.png)
 #### Water Report Upload
 
 - Upload monthly water meter readings by filling in the `template/water_report_template.xlsx` file. Make sure the column headers reflect the correct date ranges.
@@ -130,7 +130,7 @@ After the above steps, if initializing via Python, relationships between entitie
 - Create one-off charges ("other rent") that will appear on invoices, by clicking on *Add receivable*. Confirm to avoid duplicating charges. 
 
 ### Generate Invoices
-![invoice page](https://private-user-images.githubusercontent.com/86082214/379460061-8a47ea24-0723-47a0-9876-6160d7a62a09.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3Mjk3MTc0NTgsIm5iZiI6MTcyOTcxNzE1OCwicGF0aCI6Ii84NjA4MjIxNC8zNzk0NjAwNjEtOGE0N2VhMjQtMDcyMy00N2EwLTk4NzYtNjE2MGQ3YTYyYTA5LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDEwMjMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQxMDIzVDIwNTkxOFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWM0NmNmZDZjOGYxMGE0YWY1NTk4Njg5NjYzNzFmNWVhMDQ2ZGIxMWI5NDUyYjg4OTkyODk1NTU2MTYwYWZkZTgmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.WFsOX-FLhCa4Mga6eqq29W_axdR8l-UljQ8xHI65iBA)
+![invoice page](https://imgur.com/T6CaiQV.png)
 
 This page will note if monthly charges for the statement date exists before generating invoices. This page will also note if the invoice for the statement date already exists
 
@@ -141,7 +141,7 @@ This page will note if monthly charges for the statement date exists before gene
 - After the invoices are created, user will be shown an option to download them as a .zip file.
 
 ### Accounts and DB Management
-![account mgmt page](https://private-user-images.githubusercontent.com/86082214/379460199-66a67a3c-d42c-45db-bdf8-49d9a36b9ba0.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3Mjk3MTc0NTgsIm5iZiI6MTcyOTcxNzE1OCwicGF0aCI6Ii84NjA4MjIxNC8zNzk0NjAxOTktNjZhNjdhM2MtZDQyYy00NWRiLWJkZjgtNDlkOWEzNmI5YmEwLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDEwMjMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQxMDIzVDIwNTkxOFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTAxNmUxMTUyMzU1MGRiY2JkODdhODMwMGYwOWYzMWQ4ZDQzZGRlMDVhNTdlZDkyYzI4YjdjNGE3MjdhNmNkYTMmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.Wkq50LYwp-_tcV-kxSN44wrTlFxpJvm2ei3bxdyVauA)
+![account mgmt page](https://imgur.com/CUDKgyb.png)
 #### Add a New Invoice Setting
 
 - Allows users to configure new invoice settings.
