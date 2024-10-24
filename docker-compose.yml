@@ -10,6 +10,12 @@ services:
       - .env
     volumes:
       - db_volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 30s
+      retries: 5
+      start_period: 1m
+      timeout: 10s
 
   billing_service:
     image: billing-service:dev
@@ -18,7 +24,8 @@ services:
       context: .
       dockerfile: app/Dockerfile
     depends_on:
-      - billing_db
+      billing_db:
+        condition: service_healthy
     ports:
       - "8001:8001"
     env_file:

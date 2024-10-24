@@ -479,7 +479,7 @@ def manage_receivables_page():
 
 
 def generate_invoices_page():
-    st.header("Process Payments and Generate Invoices")
+    st.header("Generate Invoices")
 
     def _initialize_state():
         if "invoice_data" not in st.session_state:
@@ -496,28 +496,29 @@ def generate_invoices_page():
     template_path = app_config.template_path
     export_path = app_config.output_path
     invoice_setting = st.session_state.invoice_setting
-
+    
+    st.subheader(f"Status check for {statement_date.strftime("%B %Y")} statement")
     i_check = api.get_invoices_for_statement_date(statement_date)
     if i_check: 
         st.info("Invoice for this statement date already in DB")
 
     w_check = api.get_water_usages_for_statement_date(statement_date)
     if w_check:
-        st.success("Water readings in DB for this statement date")
+        st.success("Water readings in DB")
     else:
-        st.error("Water readings not found in DB for this statement date")
+        st.error("Water readings not found in DB")
     
     s_check = api.get_storages_for_statement_date(statement_date)
     if s_check:
-        st.success("Storages in DB for this statement date")
+        st.success("Storages in DB")
     else:
-        st.error("Storages not found in DB For this statement_date")
+        st.error("Storages not found in DB")
 
     r_check = api.get_rents_for_statement_date(statement_date)
     if r_check:
-        st.success("Rents in DB for this statement date")
+        st.success("Rents in DB")
     else:
-        st.error("Rents not found in DB for this statement date")
+        st.error("Rents not found in DB")
 
     o_check = api.get_other_rent_receivables(statement_date)
     if o_check:

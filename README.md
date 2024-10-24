@@ -6,6 +6,7 @@ This app enables managing payments, charge receivables, generating monthly rent 
 - [Installation](#installation)
 - [How to Use](#how-to-use)
   - [Initializing](#initializing)
+  - [UI Overview](#ui-overview)
   - [Manage Payments](#manage-payments)
     - [View Recent Payments](#view-recent-payments)
     - [Add New Payments](#add-new-payments)
@@ -67,7 +68,7 @@ Once the containers are built, the app can be restarted using `docker compose up
 
 The Streamlit UI is available at [http://localhost:8501](http://localhost:8501). If it doesn’t load, verify Docker containers are running with `docker ps`
 
-
+---
 ### Initializing
 
 To initialize the service, following data must be input (recommended to follow the order shown below). This can be done via Streamlit or a Python script:
@@ -85,75 +86,98 @@ After the above steps, if initializing via Python, relationships between entitie
   `app.utilities.queries.update_tenant_account_id`
 - Assign tenants to accounts:  
   `app.utilities.queries.update_watermeter_lot_id`
+---
+### UI Overview:
+![ui overview](https://i.imgur.com/yK69tR6.png)
 
-#### Note:
-- **Invoice Settings** dictate the billing cycle and fees. The billing cycle defaults to one month, with invoices due on the 1st of each month.
-- The **overdue cut off days** attribute determines when an invoice becomes overdue (default is 10 days after the statement date).
-- The **effective as of** date helps autofill the correct invoice settings for a given statement date.
-- If any, values in **rental rate override** attribute of **Accounts** will take precedent over the default monthly rent in the invoice settings for monthly rent calculation.
+All pages in the application will be configured for the statement date selected in ${\color{red}\large⓵}$ **Statement Date** and calculate invoices using the values shown in ${\color{red}\large⓶}$ **Invoice Setting**. 
+
+- The latter also dictates the monthly billing cycles (payments due on the 1st of each month + 10 day grace period by default)
+
+- Depending on each invoice setting's *effective as of* date value, the user session's invoice setting may auto-align with changes to the session's statement date.
+
+- [*For development*] User can ${\color{red}(a)}$ **Manually set the processing date** to perform tasks on the application as if it was being done on another date than today
+
+---
 
 ### Manage Payments
-![payments page](https://i.imgur.com/87reYE7.png)
-#### View Recent Payments
-
+![payments page](https://i.imgur.com/K1ecT37.png)
+#### ${\color{blue}\large⓵}$ View Recent Payments
+- ![preview_payments](https://i.imgur.com/ZZyxae0.png)
 - Check the box labeled "See recently uploaded payments" to view payments.
-- Filter payments by date to show entries from a specific period.
-- Adjust the number of displayed payments with "Show more" or "Show less" buttons.
-- Select a payment and confirm deletion if needed.
+- Filter payments by date to show entries made since a specified date.
+- Delete payment(s) as needed by selecting the desired indices.
 
-#### Add New Payments
-
+#### ${\color{blue}\large⓶}$ Add New Payments
+- ![add_payments](https://i.imgur.com/aabmtm4.png)
 - Check the "Select to record new payments" box to input new payments.
 - Submit payment details (amount, payer info, dates).
 - Number of payments for submission can be increased.
 - For payments matching an existing entry (based on amount, date, account), confirmation will be required.
 - Error is displayed for attempting to submit any payments with amount set to 0.
 
-#### Process Payments
-
+#### ${\color{blue}\large⓷}$ Process Payments
+- ![process_payments](https://i.imgur.com/RFospHm.png)
 - Use the "Process payments" button to use available payments for outstanding receivables.
 
+---
 ### Manage Receivables
-![receivables page](https://imgur.com/mDkWtyl.png)
-#### Water Report Upload
+Manage Receivables page will show three main functions as shown:
+![receivables page](https://imgur.com/irLQAkr.png)
+#### ${\color{red}\large⓵}$ Water Report Upload
+- Upload monthly water meter readings using the `template/water_report_template.xlsx` file.
+- ![water_upload_bad](https://imgur.com/WPiT4E2.png)
+- Ensure the column headers reflect the correct date ranges.
+- Ensure the report does not have rows with empty readings or rows with previous reading larger than current reading
+- ![water_upload_good](https://imgur.com/CVBRFR1.png)
+- Note, the session statement date is set to October 2024, so these water meter readings will be recorded for October 2024 invoice
 
-- Upload monthly water meter readings by filling in the `template/water_report_template.xlsx` file. Make sure the column headers reflect the correct date ranges.
+#### ${\color{red}\large⓶}$ Recurring Receivables
+- ![recurring_receivables](https://imgur.com/8rNZO3n.png)
+- Monthly charges for rent, water, storage, and late fees are calculated and shown when selecting **See a preview of charges to be created for this billing cycle**, if they have not already been for the statement date. 
+- **Water meter readings for the statement date must be uploaded first to create recurring charges altogether**.
+- **Late fee** will appear if the invoices have become overdue, based on the user's processing date (today, by default) and statement date.
+- If the numbers look correct, click **Record new recurring charges** to create them in the database for invoicing
 
-#### Recurring Receivables
-
-- Monthly charges for rent, water, storage, and late fees are calculated and shown when selecting *See a preview of charges to be created for this billing cycle*, if they have not already been for the statement date. 
-
-- Currently, **water usage report must be uploaded for the statement date to generate recurring charges**.
-
-#### One-off Receivables
-
-- Create one-off charges ("other rent") that will appear on invoices, by clicking on *Add receivable*. Confirm to avoid duplicating charges. 
-
+#### ${\color{red}\large⓷}$ One-off Receivables
+- ![one_off_charges](https://imgur.com/5O071Sr.png)
+- Create one-off charges ("other rent"), by clicking on *Add receivable* and filling in the relevant details.
+- User will be prompted to confirm that the new entry is not a duplicate, if possible duplicate entry is detected. 
+---
 ### Generate Invoices
-![invoice page](https://imgur.com/T6CaiQV.png)
+![invoice page](https://i.imgur.com/LP2GtvK.png)
 
-This page will note if monthly charges for the statement date exists before generating invoices. This page will also note if the invoice for the statement date already exists
+#### ${\color{blue}\large⓵}$ Status Check
+- When user opens the Generate Invoices page, the page will indicate whether the necessary data components are recorded in the database for the session's statement date
 
-#### Generate Invoices
-
-- "Generate Invoices" will create .xlsx files in the `billing_console` container and selecting "Update Database" will record the invoice details to the database when the files are created.
-
-- After the invoices are created, user will be shown an option to download them as a .zip file.
+#### ${\color{blue}\large⓶}$ Generate Invoices
+- If the monthly water, storage and rent charges for the statement date are in the database, user can generate the invoices.
+- Create invoices files in .xlsx format by clicking **Generate Invoices**.
+- By default, **Update Database** is selected to record the invoice details to the database when the invoice files are created.
+- ![invoice_download](https://imgur.com/VVDs2PZ.png)
+- After the invoices are created, user will be shown an option to download them to local directory as a .zip file.
 
 ### Accounts and DB Management
-![account mgmt page](https://imgur.com/CUDKgyb.png)
-#### Add a New Invoice Setting
+![account mgmt page](https://imgur.com/DC6jSI9.png)
+#### ${\color{red}\large⓵}$ Add a New Invoice Setting
+- ![add_setting](https://imgur.com/BT5tYDr.png)
+- The second to last user input referring to **number of days for grace period** defaults to 10 days 
+    - i.e. Unpaid October 1, 2024 invoices created here will be overdue starting October 11, 2024.
+- The last user input item referring to **first effective statement date** date helps autofill the correct invoice settings for a given statement date.
 
-- Allows users to configure new invoice settings.
+#### ${\color{red}\large⓶}$ Open a New Account
+![add_account](https://imgur.com/FbuHXGn.png)
+- All payments and receivables in this application are attributed to an account.
+- Create a new account by filling in the form and submitting to the database.
+    - Lot assignment is optional
+- Input values for the first two items **available lots** and **person to assign** will not list any possible options if there are none available. User may consider to create new entities or unlink them from existing accounts to make options available.
+- Any inputs to **Enter monthly rent ONLY IF DIFFERENT FROM others'** will take precedent over the default monthly rent in the invoice settings for the new account's monthly rent calculation.
 
-#### Open a New Account
+#### ${\color{red}\large⓷}$ Manage Account Details
+![delete_account](https://imgur.com/oyBAHiv.png)
+- Delete an existing account by selecting from the drop down menu.
 
-- Opens a new account. Ensure that available lots and tenants are present before creating an account.
-
-#### Manage Account Details
-
-- Manage or delete existing accounts, with confirmation required for deletions.
-
-#### Add a New Tenant
-
-- Add new tenants to the system.
+#### ${\color{red}\large④}$ Add a New Tenant
+![add_tenant](https://imgur.com/kOdCEN0.png)
+- Add new tenants by filling in the form.
+    - Account assignment is optional.
