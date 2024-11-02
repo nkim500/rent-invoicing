@@ -2,19 +2,18 @@ import base64
 import os
 import re
 import shutil
-from datetime import date, datetime
-from io import BytesIO
-import time
-
-
-import pandas as pd
-import streamlit as st
 import zipfile
-from pydantic import ValidationError
-from openpyxl import load_workbook
-from openpyxl.worksheet.worksheet import Worksheet
+from datetime import date
+from datetime import datetime
+from io import BytesIO
 
 import data_models as models
+import pandas as pd
+import streamlit as st
+from openpyxl import load_workbook
+from openpyxl.worksheet.worksheet import Worksheet
+from pydantic import ValidationError
+
 
 def statement_date_widget() -> date:
     st.sidebar.write("Select the statement date to work on:")
@@ -34,37 +33,34 @@ def statement_date_widget() -> date:
 
 
 def format_func_invoice_settings(invoice_setting: dict):
-    return (f"""
+    return f"""
         Date: {
             invoice_setting["inserted_at"][:10]} - Rent ${invoice_setting["rent_monthly_rate"]:.2f} / Storage ${invoice_setting["storage_monthly_rate"]:.2f} / Water_rate ${invoice_setting["water_monthly_rate"]:.6f} / Water_fee ${invoice_setting["water_service_fee"]:.2f} / Late_fee {invoice_setting["late_fee_rate"]*100:.1f}%
-    """
-    )
+    """  # noqa: E501
 
 
 def invoice_setting_widget(invoice_settings: list[dict]) -> dict:
-
-    if (
-        st.session_state.statement_date
-        and st.session_state.invoice_setting_index is None
-    ):
+    if st.session_state.statement_date and st.session_state.invoice_setting_index is None:
         matching_index = next(
             (
-                i for i, setting in enumerate(invoice_settings)
+                i
+                for i, setting in enumerate(invoice_settings)
                 if (
                     date.fromisoformat(setting["effective_as_of"])
                     <= st.session_state.statement_date
                 )
-            ), None
+            ),
+            None,
         )
         st.session_state.invoice_setting_index = (
             matching_index if matching_index is not None else None
         )
-    
+
     st.session_state.invoice_setting = st.selectbox(
         "Select the invoice configuration",
         options=invoice_settings,
         format_func=format_func_invoice_settings,
-        index=st.session_state.invoice_setting_index
+        index=st.session_state.invoice_setting_index,
     )
 
     return st.session_state.invoice_setting
@@ -72,7 +68,7 @@ def invoice_setting_widget(invoice_settings: list[dict]) -> dict:
 
 def extract_lot_number(lot_id: str | None) -> int | None:
     if lot_id:
-        return int(re.sub(r'\D', '', lot_id))
+        return int(re.sub(r"\D", "", lot_id))
     else:
         return lot_id
 
@@ -80,23 +76,28 @@ def extract_lot_number(lot_id: str | None) -> int | None:
 def preview_payments_dataframe(
     payments: list[dict], acccounts_with_tenant_info: list[dict] | None = None
 ) -> pd.DataFrame:
-    df = pd.DataFrame([i for i in payments])
+    df = pd.DataFrame(list(payments))
     df["amount_available"] = df["amount"] - df["amount_applied"]
     pmt_columns = [
-        "id", "inserted_at", "payer", "beneficiary_account_id", "amount_available",\
-        "amount", "payment_received"
+        "id",
+        "inserted_at",
+        "payer",
+        "beneficiary_account_id",
+        "amount_available",
+        "amount",
+        "payment_received",
     ]
     df = df[pmt_columns]
 
     if acccounts_with_tenant_info:
-        acct = pd.DataFrame([i for i in acccounts_with_tenant_info])
+        acct = pd.DataFrame(list(acccounts_with_tenant_info))
         acct.rename(
             columns={"id": "account_id", "full_name": "Payment for"}, inplace=True
         )
         df = df.merge(
             acct, how="left", left_on="beneficiary_account_id", right_on="account_id"
         )
-        df= df[pmt_columns[:3] + ["Payment for", "lot_id"] + pmt_columns[3:]]
+        df = df[pmt_columns[:3] + ["Payment for", "lot_id"] + pmt_columns[3:]]
         df = df.drop(columns=["beneficiary_account_id"])
 
     df.rename(
@@ -105,8 +106,9 @@ def preview_payments_dataframe(
             "payment_received": "Received on",
             "payer": "Payment made by",
             "amount": "Original amount",
-            "amount_available": "Available amount"
-        }, inplace=True
+            "amount_available": "Available amount",
+        },
+        inplace=True,
     )
 
     return df
@@ -118,70 +120,68 @@ def preview_charges_dataframe(
     payments: list[dict] | None = None,
 ) -> pd.DataFrame:
     df_new = pd.DataFrame.from_dict(
-        {k: {
-            item['charge_type']: sum(
-                i['amount_due'] for i in v[0] if i['charge_type'] == item['charge_type']
-            ) for item in v[0] if item is not None
-        } for k, v in receivables.items()},
-        orient='index'
+        {
+            k: {
+                item["charge_type"]: sum(
+                    i["amount_due"]
+                    for i in v[0]
+                    if i["charge_type"] == item["charge_type"]
+                )
+                for item in v[0]
+                if item is not None
+            }
+            for k, v in receivables.items()
+        },
+        orient="index",
     )
     df_new = df_new[sorted(df_new.columns, reverse=True)]
     df_new["total_new"] = df_new.sum(axis=1)
     df_in_db = pd.DataFrame.from_dict(
         {
-            k: sum(
-                item['amount_due'] for item in v[1] if item['paid'] is False
-            ) if v[1] else None for k, v in receivables.items()
-        }, orient='index', columns=['current_outstanding']
+            k: sum(item["amount_due"] for item in v[1] if item["paid"] is False)
+            if v[1]
+            else None
+            for k, v in receivables.items()
+        },
+        orient="index",
+        columns=["current_outstanding"],
     )
-    output_df = df_in_db.merge(df_new, how='left', left_index=True, right_index=True)
+    output_df = df_in_db.merge(df_new, how="left", left_index=True, right_index=True)
     if "late_fee" in output_df.columns:
-        new_cols = [col for col in output_df.columns if col != 'late_fee']
-        new_cols.append('late_fee')
+        new_cols = [col for col in output_df.columns if col != "late_fee"]
+        new_cols.append("late_fee")
         output_df = output_df[new_cols]
-    base_col = ['current_outstanding']
+    base_col = ["current_outstanding"]
     for col in output_df.columns:
-        if col != 'current_outstanding':
+        if col != "current_outstanding":
             base_col.append(col)
     output_df = output_df[base_col]
 
-    df = (
-        pd.DataFrame(accounts).merge(
-            output_df, how='left', left_on='id', right_index=True
-        )
+    df = pd.DataFrame(accounts).merge(
+        output_df, how="left", left_on="id", right_index=True
     )
-    
-    label_columns = ['id', 'lot_id', 'full_name']
+
+    label_columns = ["id", "lot_id", "full_name"]
     value_columns = [i for i in df.columns if i not in label_columns]
-    df['total_due'] = df[value_columns].sum(axis=1) - df["total_new"]
+    df["total_due"] = df[value_columns].sum(axis=1) - df["total_new"]
 
     if payments:
         payments_df = pd.DataFrame(payments)
-        payments_df['payment_available'] = (
-            payments_df['amount'] - payments_df['amount_applied']
+        payments_df["payment_available"] = (
+            payments_df["amount"] - payments_df["amount_applied"]
         )
-        payments_df.rename(
-            columns={
-                "beneficiary_account_id": "account_id"
-            },
-            inplace=True
-        )
+        payments_df.rename(columns={"beneficiary_account_id": "account_id"}, inplace=True)
         agg = payments_df.groupby("account_id").payment_available.sum()
-        df = df.merge(
-            pd.DataFrame(agg),
-            how="left",
-            left_on="id",
-            right_index=True
-        )
+        df = df.merge(pd.DataFrame(agg), how="left", left_on="id", right_index=True)
         df.payment_available.fillna(value=0, inplace=True)
-        df['balance_after_payment'] = df.apply(
+        df["balance_after_payment"] = df.apply(
             lambda x: max(x.total_due - x.payment_available, 0), axis=1
         )
 
-    df['lot_numbers'] = df.lot_id.apply(lambda x: extract_lot_number(x))
-    df = df.sort_values(by='lot_numbers').set_index("lot_numbers")
+    df["lot_numbers"] = df.lot_id.apply(lambda x: extract_lot_number(x))
+    df = df.sort_values(by="lot_numbers").set_index("lot_numbers")
 
-    preview_columns = [i for i in df.columns if i != 'id']
+    preview_columns = [i for i in df.columns if i != "id"]
 
     return df[preview_columns]
 
@@ -198,11 +198,12 @@ def duplicate_payment_entry_check(
         for existing_payment in existing_payment_objs:
             # Compare relevant fields to check if they are duplicates
             if (
-                new_payment.beneficiary_account_id == existing_payment.beneficiary_account_id and
-                new_payment.amount == existing_payment.amount and
-                new_payment.payment_dated == existing_payment.payment_dated and
-                new_payment.payment_received == existing_payment.payment_received and
-                new_payment.payer == existing_payment.payer
+                new_payment.beneficiary_account_id
+                == existing_payment.beneficiary_account_id
+                and new_payment.amount == existing_payment.amount
+                and new_payment.payment_dated == existing_payment.payment_dated
+                and new_payment.payment_received == existing_payment.payment_received
+                and new_payment.payer == existing_payment.payer
             ):
                 return True  # Duplicate found
     return False
@@ -210,17 +211,18 @@ def duplicate_payment_entry_check(
 
 def duplicate_accounts_receivable_entry_check(
     new_receivables: list[models.AccountsReceivable],
-    existing_receivables: list[models.AccountsReceivable]
+    existing_receivables: list[models.AccountsReceivable],
 ) -> bool:
     # Iterate over each new payment and check for duplicates
     for new_receivable in new_receivables:
         for existing_receivable in existing_receivables:
             # Compare relevant fields to check if they are duplicates
             if (
-                new_receivable.account_id == existing_receivable.account_id and
-                new_receivable.amount_due == existing_receivable.amount_due and
-                new_receivable.statement_date == existing_receivable.statement_date and
-                new_receivable.charge_type.value == existing_receivable.charge_type.value
+                new_receivable.account_id == existing_receivable.account_id
+                and new_receivable.amount_due == existing_receivable.amount_due
+                and new_receivable.statement_date == existing_receivable.statement_date
+                and new_receivable.charge_type.value
+                == existing_receivable.charge_type.value
             ):
                 return True  # Duplicate found
     return False
@@ -239,7 +241,7 @@ def remove_empty_rows(ws: Worksheet) -> Worksheet:
 
     for row_del in range(len(index_row)):
         ws.delete_rows(idx=index_row[row_del], amount=1)
-        index_row = list(map(lambda k: k - 1, index_row))
+        index_row = [k - 1 for k in index_row]
 
     ws.insert_rows(add_back_start_row, add_back_count)
 
@@ -264,7 +266,7 @@ def generate_invoices(
         wb.save(export_file_path)
         wb.close()
     return export_file_paths
-            
+
 
 def ingest_water_meter_readings(report_file: BytesIO) -> pd.DataFrame:
     df = pd.read_excel(report_file, header=1, index_col=0)
@@ -277,19 +279,19 @@ def ingest_water_meter_readings(report_file: BytesIO) -> pd.DataFrame:
             df.rename(
                 columns={
                     df.columns[3]: df.columns[3].date(),
-                    df.columns[2]: df.columns[2].date()
-                }, inplace=True
+                    df.columns[2]: df.columns[2].date(),
+                },
+                inplace=True,
             )
     except AssertionError as e:
-        raise(e)
-    
+        raise (e)
+
     return df
 
 
 def generate_water_usage_objects(
     report: pd.DataFrame, statement_date: date | None = None
 ) -> list[models.WaterUsage]:
-    
     if not statement_date:
         statement_date = date.today().replace(day=1)
 
@@ -302,7 +304,7 @@ def generate_water_usage_objects(
     for _, row in report.iterrows():
         try:
             water_usage = models.WaterUsage(
-                watermeter_id=row['Meter #'],
+                watermeter_id=row["Meter #"],
                 previous_date=previous_date,
                 current_date=current_date,
                 statement_date=statement_date,
@@ -319,18 +321,18 @@ def generate_water_usage_objects(
     return water_usages
 
 
-def get_binary_file_downloader_html(bin_file, file_label='File'):
-    with open(bin_file, 'rb') as f:
+def get_binary_file_downloader_html(bin_file, file_label="File"):
+    with open(bin_file, "rb") as f:
         data = f.read()
     bin_str = base64.b64encode(data).decode()
-    href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
+    href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'  # noqa: E501
     return href
 
 
 def user_download_invoice_zip(file_dir: str):
     zip_buffer = BytesIO()
 
-    with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
         for filename in os.listdir(file_dir):
             if filename.endswith(".xlsx"):
                 filepath = os.path.join(file_dir, filename)
@@ -340,7 +342,7 @@ def user_download_invoice_zip(file_dir: str):
         label="Download All Reports",
         data=zip_buffer,
         file_name="all_reports.zip",
-        mime="application/zip"
+        mime="application/zip",
     )
     zip_buffer.close()
 

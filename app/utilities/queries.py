@@ -1,18 +1,22 @@
-from datetime import date, timedelta
+from datetime import date
+from datetime import timedelta
 from uuid import UUID
 
-from sqlalchemy import Select, not_, or_, text
+import utilities.data_models as models
+from sqlalchemy import UUID as UUIDSA
+from sqlalchemy import Select
 from sqlalchemy import Update
 from sqlalchemy import desc
 from sqlalchemy import func
 from sqlalchemy import literal
+from sqlalchemy import not_
+from sqlalchemy import or_
+from sqlalchemy import text
 from sqlalchemy import update
-from sqlalchemy import UUID as UUIDSA
 from sqlalchemy.sql.functions import coalesce
-from sqlmodel import and_, case
+from sqlmodel import and_
+from sqlmodel import case
 from sqlmodel import select
-
-import utilities.data_models as models
 
 
 def get_receivables_query(statement_date: date | None = None) -> Select:
@@ -21,21 +25,17 @@ def get_receivables_query(statement_date: date | None = None) -> Select:
         query = query.where(
             or_(
                 models.AccountsReceivable.statement_date == statement_date,
-                models.AccountsReceivable.paid.is_(False)
+                models.AccountsReceivable.paid.is_(False),
             )
         )
     return query
 
 
 def get_receivables_sum_query(statement_date: date | None = None) -> Select:
-    query = (
-        select(
-            models.AccountsReceivable.account_id.label('account_id'),
-            func.sum(models.AccountsReceivable.amount_due).label('receivables_sum')
-        ).group_by(
-            models.AccountsReceivable.account_id
-        )
-    )
+    query = select(
+        models.AccountsReceivable.account_id.label("account_id"),
+        func.sum(models.AccountsReceivable.amount_due).label("receivables_sum"),
+    ).group_by(models.AccountsReceivable.account_id)
     if statement_date:
         query = query.where(models.AccountsReceivable.statement_date == statement_date)
 
@@ -43,36 +43,25 @@ def get_receivables_sum_query(statement_date: date | None = None) -> Select:
 
 
 def get_a_receivable_query(ar_id: UUID) -> Select:
-    return (
-        select(models.AccountsReceivable).where(models.AccountsReceivable.id == ar_id)
-    )
+    return select(models.AccountsReceivable).where(models.AccountsReceivable.id == ar_id)
 
 
 def get_payments_query() -> Select:
-    query = (
-        select(
-            models.Payment.beneficiary_account_id.label('account_id'),
-            func.sum(models.Payment.amount).label('payments_sum')
-        ).group_by(
-            models.Payment.beneficiary_account_id
-        )
-    )
+    query = select(
+        models.Payment.beneficiary_account_id.label("account_id"),
+        func.sum(models.Payment.amount).label("payments_sum"),
+    ).group_by(models.Payment.beneficiary_account_id)
     return query
 
 
 def get_water_usage_query(statement_date: date | None = None) -> Select:
-
     query = (
-        select(
-            models.Account.id, models.WaterUsage
-        ).join_from(
-            models.Account,
-            models.Lot,
-            models.Account.lot_id == models.Lot.id
-        ).join_from(
+        select(models.Account.id, models.WaterUsage)
+        .join_from(models.Account, models.Lot, models.Account.lot_id == models.Lot.id)
+        .join_from(
             models.Lot,
             models.WaterMeter,
-            models.Lot.watermeter_id == models.WaterMeter.id
+            models.Lot.watermeter_id == models.WaterMeter.id,
         )
         .where(models.Account.deleted_on.is_(None))
     )
@@ -81,30 +70,26 @@ def get_water_usage_query(statement_date: date | None = None) -> Select:
         query = query.join_from(
             models.WaterMeter,
             models.WaterUsage,
-            models.WaterMeter.id == models.WaterUsage.watermeter_id
+            models.WaterMeter.id == models.WaterUsage.watermeter_id,
         ).where(models.WaterUsage.statement_date == statement_date)
     else:
-        subquery = (
-            select(
-                models.WaterUsage,
-                func.row_number().over(
-                    partition_by=models.WaterUsage.watermeter_id,
-                    order_by=desc(models.WaterUsage.statement_date)
-                ).label('row_num')
-            ).subquery()
-        )
+        subquery = select(
+            models.WaterUsage,
+            func.row_number()
+            .over(
+                partition_by=models.WaterUsage.watermeter_id,
+                order_by=desc(models.WaterUsage.statement_date),
+            )
+            .label("row_num"),
+        ).subquery()
         query = query.join_from(
-            models.WaterMeter,
-            subquery,
-            models.WaterMeter.id == subquery.c.watermeter_id
+            models.WaterMeter, subquery, models.WaterMeter.id == subquery.c.watermeter_id
         ).where(subquery.c.row_num == 1)
 
     return query
 
 
-def update_watermeter_lot_id_query(
-    watermeter_id: int, lot_id: str
-) -> Update:
+def update_watermeter_lot_id_query(watermeter_id: int, lot_id: str) -> Update:
     return (
         update(models.WaterMeter)
         .where(models.WaterMeter.id == watermeter_id)
@@ -112,9 +97,7 @@ def update_watermeter_lot_id_query(
     )
 
 
-def update_tenant_account_id_query(
-    tenant_id: UUID, account_id: UUID
-) -> Update:
+def update_tenant_account_id_query(tenant_id: UUID, account_id: UUID) -> Update:
     return (
         update(models.Tenant)
         .where(models.Tenant.id == tenant_id)
@@ -125,26 +108,15 @@ def update_tenant_account_id_query(
 def get_other_rents_query(
     account_id: UUID | None = None, statement_date: date | None = None
 ) -> Select:
-    query = (
-        select(models.AccountsReceivable)
-        .where(
-            and_(
-                (
-                    models.AccountsReceivable.charge_type
-                    == models.ChargeTypes.OTHER
-                ),
-                (
-                    models.AccountsReceivable.account_id
-                    == account_id if account_id else True
-                )
-            )
+    query = select(models.AccountsReceivable).where(
+        and_(
+            (models.AccountsReceivable.charge_type == models.ChargeTypes.OTHER),
+            (models.AccountsReceivable.account_id == account_id if account_id else True),
         )
     )
     if statement_date:
-        query = query.where(
-            models.AccountsReceivable.statement_date == statement_date
-        )
-    
+        query = query.where(models.AccountsReceivable.statement_date == statement_date)
+
     return query.order_by(models.AccountsReceivable.inserted_at.desc())
 
 
@@ -153,34 +125,25 @@ def get_unpaid_items_query(
     statement_date: date | None = None,
     processing_date: date | None = None,
 ) -> Select:
-    query = (
-        select(models.AccountsReceivable)
-        .where(
-            and_(
-                models.AccountsReceivable.paid.is_(False),
-                models.AccountsReceivable.account_id == account_id
-            )
+    query = select(models.AccountsReceivable).where(
+        and_(
+            models.AccountsReceivable.paid.is_(False),
+            models.AccountsReceivable.account_id == account_id,
         )
     )
     if statement_date:
-        query = query.where(
-            models.AccountsReceivable.statement_date == statement_date
-        )
+        query = query.where(models.AccountsReceivable.statement_date == statement_date)
     if processing_date:
-        query = query.where(
-            models.AccountsReceivable.statement_date <= processing_date
-        )
-    
+        query = query.where(models.AccountsReceivable.statement_date <= processing_date)
+
     return query.order_by(models.AccountsReceivable.inserted_at.desc())
 
 
 def get_all_unpaid_items_query(
-    statement_date: date | None = None,
-    processing_date: date | None = None
+    statement_date: date | None = None, processing_date: date | None = None
 ) -> Select:
-    query = (
-        select(models.AccountsReceivable)
-        .where(models.AccountsReceivable.paid.is_(False))
+    query = select(models.AccountsReceivable).where(
+        models.AccountsReceivable.paid.is_(False)
     )
     if statement_date:
         query = query.where(models.AccountsReceivable.statement_date < statement_date)
@@ -195,9 +158,8 @@ def get_receivable_by_charge_type_query(
     processing_date: date | None = None,
     is_paid: bool | None = None,
 ) -> Select:
-    query = (
-        select(models.AccountsReceivable)
-        .where(models.AccountsReceivable.charge_type == charge_type)
+    query = select(models.AccountsReceivable).where(
+        models.AccountsReceivable.charge_type == charge_type
     )
     if statement_date:
         query = query.where(models.AccountsReceivable.statement_date == statement_date)
@@ -209,12 +171,10 @@ def get_receivable_by_charge_type_query(
 
 
 def get_available_payments_query(
-    account_id: UUID | None = None,
-    processing_date: date | None = None
+    account_id: UUID | None = None, processing_date: date | None = None
 ) -> Select:
-    query = (
-        select(models.Payment)
-        .where(models.Payment.amount > models.Payment.amount_applied)
+    query = select(models.Payment).where(
+        models.Payment.amount > models.Payment.amount_applied
     )
     if account_id:
         query = query.where(models.Payment.beneficiary_account_id == account_id)
@@ -225,8 +185,8 @@ def get_available_payments_query(
 
 
 def get_invoice_settings_query():
-    return (
-        select(models.InvoiceSetting).order_by(models.InvoiceSetting.inserted_at.desc())
+    return select(models.InvoiceSetting).order_by(
+        models.InvoiceSetting.inserted_at.desc()
     )
 
 
@@ -236,9 +196,7 @@ def get_invoice_setting_query(setting_id: UUID | str):
             setting_id = UUID(setting_id)
         except Exception as e:
             raise e
-    return (
-        select(models.InvoiceSetting).where(models.InvoiceSetting.id == setting_id)
-    )
+    return select(models.InvoiceSetting).where(models.InvoiceSetting.id == setting_id)
 
 
 def get_recent_payments_query(since_when: date | None = None):
@@ -257,19 +215,15 @@ def get_tenant_query(tenant_id: UUID):
     return select(models.Tenant).where(models.Tenant.id == tenant_id)
 
 
-def get_accounts_query(
-    with_tenant_info: bool = False, active_only: bool = False
-):
+def get_accounts_query(with_tenant_info: bool = False, active_only: bool = False):
     if with_tenant_info:
-        query = (
-            select(
-                models.Account.id,
-                models.Account.lot_id,
-                func.concat(
-                    models.Tenant.first_name, " ", models.Tenant.last_name
-                ).label("full_name"))
-            .join(models.Tenant, models.Account.account_holder == models.Tenant.id)
-        )
+        query = select(
+            models.Account.id,
+            models.Account.lot_id,
+            func.concat(models.Tenant.first_name, " ", models.Tenant.last_name).label(
+                "full_name"
+            ),
+        ).join(models.Tenant, models.Account.account_holder == models.Tenant.id)
     else:
         query = select(models.Account)
 
@@ -279,37 +233,26 @@ def get_accounts_query(
     return query.order_by(models.Account.lot_id)
 
 
-def get_receivables_without_late_fees_query(
-    current_date: date,
-    days: int = 10
-):
-
+def get_receivables_without_late_fees_query(current_date: date, days: int = 10):
     late_fee_subquery = (
-        select(models.AccountsReceivable.details['original_item_id'].astext.cast(UUIDSA))
+        select(models.AccountsReceivable.details["original_item_id"].astext.cast(UUIDSA))
         .where(models.AccountsReceivable.charge_type == models.ChargeTypes.LATEFEE)
         .scalar_subquery()
     )
-    return (
-        select(models.AccountsReceivable)
-        .where(
-            models.AccountsReceivable.statement_date + timedelta(days=days) <= current_date,
-            models.AccountsReceivable.charge_type != models.ChargeTypes.LATEFEE,
-            models.AccountsReceivable.paid.is_(False),
-            not_(models.AccountsReceivable.id.in_(late_fee_subquery))
-        )
+    return select(models.AccountsReceivable).where(
+        models.AccountsReceivable.statement_date + timedelta(days=days) <= current_date,  # noqa: E501
+        models.AccountsReceivable.charge_type != models.ChargeTypes.LATEFEE,
+        models.AccountsReceivable.paid.is_(False),
+        not_(models.AccountsReceivable.id.in_(late_fee_subquery)),
     )
 
 
 def get_existing_invoice_query(
-    statement_date: date | None,
-    setting_id: UUID | None = None
+    statement_date: date | None, setting_id: UUID | None = None
 ):
-    return (
-        select(models.Invoice)
-        .where(
-            models.Invoice.statement_date == statement_date if statement_date else True,
-            models.Invoice.setting_id == setting_id if setting_id else True
-        )
+    return select(models.Invoice).where(
+        models.Invoice.statement_date == statement_date if statement_date else True,
+        models.Invoice.setting_id == setting_id if setting_id else True,
     )
 
 
@@ -324,7 +267,7 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
             models.InvoiceSetting.rent_monthly_rate,
             models.InvoiceSetting.storage_monthly_rate,
             models.InvoiceSetting.late_fee_rate,
-            models.InvoiceSetting.id
+            models.InvoiceSetting.id,
         )
         .where(models.InvoiceSetting.id == setting_id if setting_id else True)
         .order_by(models.InvoiceSetting.inserted_at.desc())
@@ -340,17 +283,17 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
         )
         .scalar_subquery()
     )
-    
+
     previous_bill_less_paid_subquery = coalesce(
         select(func.sum(models.AccountsReceivable.amount_due))
         .where(
             models.AccountsReceivable.account_id == models.Account.id,
             models.AccountsReceivable.statement_date == previous_month_date,
             models.AccountsReceivable.paid.is_(False),
-            models.AccountsReceivable.charge_type != models.ChargeTypes.LATEFEE
+            models.AccountsReceivable.charge_type != models.ChargeTypes.LATEFEE,
         )
         .scalar_subquery(),
-        0
+        0,
     )
 
     total_amount_due_subquery = (
@@ -368,7 +311,7 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
             models.AccountsReceivable.statement_date == previous_month_date,
             models.AccountsReceivable.charge_type == models.ChargeTypes.LATEFEE,
             models.AccountsReceivable.paid.is_(False),
-            models.AccountsReceivable.account_id == models.Account.id
+            models.AccountsReceivable.account_id == models.Account.id,
         )
         .scalar_subquery()
     )
@@ -381,7 +324,7 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
             models.Payment.payment_dated < statement_date,
         )
         .scalar_subquery()
-    ) # what if there are remainder from the months before?
+    )  # what if there are remainder from the months before?
 
     # Total amount of receivables older than one month before statement_date
     overdue_amount_subquery = (
@@ -389,7 +332,7 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
         .where(
             models.AccountsReceivable.account_id == models.Account.id,
             models.AccountsReceivable.statement_date < previous_month_date,
-            models.AccountsReceivable.paid.is_(False)
+            models.AccountsReceivable.paid.is_(False),
         )
         .scalar_subquery()
     )
@@ -406,14 +349,14 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
     )
 
     notes_subquery = (
-        select(
-            text("array_to_string(array_agg(details->>'note'), '; ')")
-        ).where(
+        select(text("array_to_string(array_agg(details->>'note'), '; ')"))
+        .where(
             models.AccountsReceivable.account_id == models.Account.id,
             models.AccountsReceivable.charge_type == models.ChargeTypes.OTHER,
             models.AccountsReceivable.paid.is_(False),
-            models.AccountsReceivable.statement_date == statement_date
-        ).scalar_subquery()
+            models.AccountsReceivable.statement_date == statement_date,
+        )
+        .scalar_subquery()
     )
 
     query = (
@@ -424,11 +367,9 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
             models.Lot.property_code,
             models.Lot.street_address,
             models.Lot.city_state_zip,
-            func.concat(
-                models.Tenant.first_name,
-                " ",
-                models.Tenant.last_name
-            ).label("full_name"),
+            func.concat(models.Tenant.first_name, " ", models.Tenant.last_name).label(
+                "full_name"
+            ),
             previous_bill_subquery.label("previous_bill_amount"),
             previous_bill_less_paid_subquery.label("previous_bill_less_paid"),
             total_amount_due_subquery.label("total_amount_due"),
@@ -439,25 +380,25 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
                 (models.Account.lot_id.is_(None), 0),
                 (
                     models.Account.rental_rate_override.isnot(None),
-                    models.Account.rental_rate_override
+                    models.Account.rental_rate_override,
                 ),
                 else_=invoice_setting_subquery.c.rent_monthly_rate,
             ).label("rent"),
             case(
                 (models.Account.storage_count == 0, None),
                 else_=invoice_setting_subquery.c.storage_monthly_rate
-                * models.Account.storage_count
+                * models.Account.storage_count,
             ).label("storage"),
             case(
+                (
+                    models.WaterUsage.id.isnot(None),
                     (
-                        models.WaterUsage.id.isnot(None),
-                        (
-                            models.WaterUsage.current_reading
-                            - models.WaterUsage.previous_reading
-                        )
-                        * invoice_setting_subquery.c.water_monthly_rate
-                        + invoice_setting_subquery.c.water_service_fee
-                    ),
+                        models.WaterUsage.current_reading
+                        - models.WaterUsage.previous_reading
+                    )
+                    * invoice_setting_subquery.c.water_monthly_rate
+                    + invoice_setting_subquery.c.water_service_fee,
+                ),
                 else_=0,
             ).label("water_bill_amount"),
             models.WaterUsage.previous_reading.label("previous_water_reading"),
@@ -467,16 +408,24 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
             models.WaterMeter.id.label("water_meter_id"),  # 20
             previous_month_late_fee_post_payments_subquery.label("late_fee"),
             invoice_setting_subquery.c.id,
-            notes_subquery.label("other_rents_notes")
+            notes_subquery.label("other_rents_notes"),
         )
-        .outerjoin_from(models.Account, models.Lot, models.Account.lot_id == models.Lot.id)
-        .join_from(models.Account, models.Tenant, models.Account.account_holder == models.Tenant.id)
-        .outerjoin_from(models.Lot, models.WaterMeter, models.Lot.id == models.WaterMeter.lot_id)
+        .outerjoin_from(
+            models.Account, models.Lot, models.Account.lot_id == models.Lot.id
+        )
+        .join_from(
+            models.Account,
+            models.Tenant,
+            models.Account.account_holder == models.Tenant.id,
+        )
+        .outerjoin_from(
+            models.Lot, models.WaterMeter, models.Lot.id == models.WaterMeter.lot_id
+        )
         .outerjoin_from(
             models.WaterMeter,
             models.WaterUsage,
             (models.WaterMeter.id == models.WaterUsage.watermeter_id)
-            & (models.WaterUsage.statement_date == statement_date)
+            & (models.WaterUsage.statement_date == statement_date),
         )
         .where(models.Account.deleted_on.is_(None))
     )
@@ -491,14 +440,12 @@ def get_available_lots_query() -> Select:
         .where(
             and_(
                 or_(
-                    (models.Account.id.is_(None)),
-                    (models.Account.deleted_on.isnot(None))
+                    (models.Account.id.is_(None)), (models.Account.deleted_on.isnot(None))
                 ),
-                models.Lot.watermeter_id.isnot(None)
+                models.Lot.watermeter_id.isnot(None),
             )
-        ).order_by(
-            models.Lot.property_code, models.Lot.id
         )
+        .order_by(models.Lot.property_code, models.Lot.id)
     )
 
 

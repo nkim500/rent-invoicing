@@ -1,9 +1,9 @@
 import json
 from uuid import UUID
+
+import loguru
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
-import loguru
-
 
 logger = loguru.logger
 
@@ -15,7 +15,7 @@ class DBConfigs(BaseSettings):
     db_port: int
     db_name: str
     model_config = SettingsConfigDict(
-        env_file='.env', env_file_encoding='utf-8', extra='ignore'
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
 
@@ -26,7 +26,7 @@ class BusinessEntityParams(BaseSettings):
     business_contact_phone: str
     business_contact_email: str
     model_config = SettingsConfigDict(
-        env_file='.env', env_file_encoding='utf-8', extra='ignore'
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
     def model_post_init(self, __context):

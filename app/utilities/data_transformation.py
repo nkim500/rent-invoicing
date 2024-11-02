@@ -1,11 +1,11 @@
-from datetime import date, timedelta
+from datetime import date
+from datetime import timedelta
 from uuid import UUID
 
-from sqlalchemy import Row
-
 import utilities.data_models as models
-from configs.config import get_logger
 from configs.config import BusinessEntityParams
+from configs.config import get_logger
+from sqlalchemy import Row
 
 logger = get_logger()
 
@@ -14,7 +14,7 @@ def incur_recurring_charges(
     input_list: list,
     charge_type: models.ChargeTypes,
     statement_date: date | None = None,
-    config: models.InvoiceSetting | None = None
+    config: models.InvoiceSetting | None = None,
 ) -> list[models.AccountsReceivable]:
     if not len(input_list):
         return
@@ -45,9 +45,7 @@ def incur_recurring_charges(
             )
         elif charge_type == models.ChargeTypes.STORAGE:
             return (
-                _i.storage_count * config.storage_monthly_rate
-                if _i.storage_count
-                else 0
+                _i.storage_count * config.storage_monthly_rate if _i.storage_count else 0
             )
         elif charge_type == models.ChargeTypes.WATER:
             return _i[1].water_bill_dollar_amount(
@@ -60,8 +58,9 @@ def incur_recurring_charges(
             account_id=_get_acct_id(i),
             amount_due=_calculate_amount_due(i, charge_type),
             statement_date=statement_date,
-            charge_type=charge_type
-        ) for i in input_list
+            charge_type=charge_type,
+        )
+        for i in input_list
         if _calculate_amount_due(i, charge_type) != 0
     ]
 
@@ -73,9 +72,10 @@ def incur_late_fee(
     config: models.InvoiceSetting,
     statement_date: date | None = None,
     processing_date: date | None = None,
-    payments: list[models.Payment] = [],
+    payments: list[models.Payment] = None,
 ) -> list[models.AccountsReceivable]:
-
+    if payments is None:
+        payments = []
     if statement_date is None:
         statement_date = models.et_date_now()
 
@@ -88,13 +88,16 @@ def incur_late_fee(
     inserts = [
         models.AccountsReceivable(
             account_id=overdue.account_id,
-            amount_due=round(overdue.amount_due * config.late_fee_rate,2),
+            amount_due=round(overdue.amount_due * config.late_fee_rate, 2),
             statement_date=statement_date,
             charge_type=models.ChargeTypes.LATEFEE,
-            details={'original_item_id': str(overdue.id)}
-        ) for overdue in still_overdue if (
-            not processing_date or
-            overdue.statement_date + timedelta(days=10) <= processing_date # setting.overdue_cutoff_days
+            details={"original_item_id": str(overdue.id)},
+        )
+        for overdue in still_overdue
+        if (
+            not processing_date
+            or overdue.statement_date + timedelta(days=10)
+            <= processing_date  # setting.overdue_cutoff_days
         )
     ]
 
@@ -105,11 +108,11 @@ def process_accounts_receivables(
     accounts_receivables: list[models.AccountsReceivable],
     payments: list[models.Payment | None],
 ) -> tuple[
-        list[models.AccountsReceivable | None],
-        list[models.AccountsReceivable | None],
-        list[models.AccountsReceivable | None],
-        list[models.AccountsReceivable | None]
-    ]:
+    list[models.AccountsReceivable | None],
+    list[models.AccountsReceivable | None],
+    list[models.AccountsReceivable | None],
+    list[models.AccountsReceivable | None],
+]:
     # Sort AccountsReceivables by inserted_at datetime descending
     accounts_receivables = sorted(
         accounts_receivables, key=lambda ar: ar.inserted_at, reverse=True
@@ -156,7 +159,7 @@ def process_accounts_receivables(
                 statement_date=receivable.statement_date,
                 charge_type=receivable.charge_type,
                 paid=False,
-                details={'residual carried over from': str(receivable.id)},
+                details={"residual carried over from": str(receivable.id)},
                 inserted_at=receivable.inserted_at,
             )
             residual.append(new_receivable)
@@ -179,15 +182,14 @@ def process_accounts_receivables(
 
 
 def _compare_ar_pair(
-    _ar: models.AccountsReceivable,
-    _ars: list[models.AccountsReceivable]
+    _ar: models.AccountsReceivable, _ars: list[models.AccountsReceivable]
 ) -> bool:
     for i in _ars:
         if (
-            _ar.account_id == i.account_id and
-            _ar.charge_type.value == i.charge_type.value and
-            _ar.statement_date == i.statement_date and
-            _ar.charge_type.value != models.ChargeTypes.OTHER.value
+            _ar.account_id == i.account_id
+            and _ar.charge_type.value == i.charge_type.value
+            and _ar.statement_date == i.statement_date
+            and _ar.charge_type.value != models.ChargeTypes.OTHER.value
         ):
             return True
     return False
@@ -211,9 +213,9 @@ def check_duplicate_accounts_receivable(
     new_ars: list[models.AccountsReceivable], in_db: list[models.AccountsReceivable]
 ) -> bool:
     """
-        At first discovery of duplicate items, the function returns True
-        This check relies on the fact that recurring charges are created for all
-        accounts simultaneously
+    At first discovery of duplicate items, the function returns True
+    This check relies on the fact that recurring charges are created for all
+    accounts simultaneously
     """
     for i in new_ars:
         if _compare_ar_pair(i, in_db):
@@ -221,20 +223,28 @@ def check_duplicate_accounts_receivable(
     return False
 
 
-
 def filter_for_new_items(
-    outstanding: list[models.AccountsReceivable] = [],
-    rents: list[models.AccountsReceivable] = [],
-    storages: list[models.AccountsReceivable] = [],
-    new_late_fees: list[models.AccountsReceivable] = [],
-    waters: list[models.AccountsReceivable] = [],
+    outstanding: list[models.AccountsReceivable] = None,
+    rents: list[models.AccountsReceivable] = None,
+    storages: list[models.AccountsReceivable] = None,
+    new_late_fees: list[models.AccountsReceivable] = None,
+    waters: list[models.AccountsReceivable] = None,
 ) -> tuple[
     list[models.AccountsReceivable],
     list[models.AccountsReceivable],
     list[models.AccountsReceivable],
-    list[models.AccountsReceivable]
+    list[models.AccountsReceivable],
 ]:
-
+    if rents is None:
+        rents = []
+    if outstanding is None:
+        outstanding = []
+    if new_late_fees is None:
+        new_late_fees = []
+    if waters is None:
+        waters = []
+    if storages is None:
+        storages = []
     for receivables in [rents, storages, new_late_fees, waters]:
         _check_duplicate(receivables, outstanding)
 
@@ -244,7 +254,6 @@ def filter_for_new_items(
 def serialize_invoice_input_data_row(
     row: Row, as_invoice_object: bool = False
 ) -> dict | list[models.Invoice]:
-
     company = BusinessEntityParams()
     statement_date = row[0]
     total_amount_due = row[9]
@@ -252,7 +261,7 @@ def serialize_invoice_input_data_row(
 
     if not total_amount_due:
         return
-    
+
     lot_id = row[2]
     csz = row[5]
     if lot_id:
@@ -281,8 +290,8 @@ def serialize_invoice_input_data_row(
         "water_bill_period": row[15],
         "water_prev_read": row[16],
         "water_curr_read": row[17],
-        "water_curr_date" : row[18],
-        "water_prev_date" : row[19],
+        "water_curr_date": row[18],
+        "water_prev_date": row[19],
         "water_meter_id": row[20],
         "amt_late_fee": row[21],
     }
@@ -292,7 +301,7 @@ def serialize_invoice_input_data_row(
             parsed['water_prev_date'].strftime("%B %Y")
         }"""
         parsed["date_water"] = statement_date
-        parsed["water_usage_period"] = row[17]-row[16]
+        parsed["water_usage_period"] = row[17] - row[16]
     else:
         parsed["desc_curr_water"] = None
         parsed["date_water"] = None
@@ -338,12 +347,12 @@ def serialize_invoice_input_data_row(
     else:
         parsed["desc_prev_month_residual"] = None
         parsed["date_today_2"] = None
-    
+
     if row[11]:
         parsed["desc_prev_overdue"] = "Previous overdue"
     else:
         parsed["desc_prev_overdue"] = None
-    
+
     if row[12]:
         parsed["desc_other_rent"] = "Other rent(s)*"
         parsed["date_other_rent"] = statement_date
@@ -354,9 +363,9 @@ def serialize_invoice_input_data_row(
         parsed["detail_other_rent"] = None
 
     parsed["invoice_date"] = models.et_date_now()
-    parsed['business_name'] = company.business_name
-    parsed['business_address_1'] = company.business_address_1
-    parsed['business_address_2'] = company.business_address_2
+    parsed["business_name"] = company.business_name
+    parsed["business_address_1"] = company.business_address_1
+    parsed["business_address_2"] = company.business_address_2
     parsed["business_contact_phone"] = company.business_contact_phone
     parsed["business_contact_email"] = company.business_contact_email
     parsed["invoice_due_date"] = statement_date
@@ -364,24 +373,23 @@ def serialize_invoice_input_data_row(
     parsed["business_address_1_"] = company.business_address_1
     parsed["business_address_2_"] = company.business_address_2
     parsed["business_contact_email_"] = f"Or Zelle to {company.business_contact_email}"
-    parsed["invoice_date_"] = parsed['invoice_date']
-    parsed["invoice_customer_id_"] = parsed['invoice_customer_id']
-    parsed["invoice_due_date_"] = parsed['invoice_due_date']
-    parsed["invoice_total_amount_due_"] = parsed['invoice_total_amount_due']
-
+    parsed["invoice_date_"] = parsed["invoice_date"]
+    parsed["invoice_customer_id_"] = parsed["invoice_customer_id"]
+    parsed["invoice_due_date_"] = parsed["invoice_due_date"]
+    parsed["invoice_total_amount_due_"] = parsed["invoice_total_amount_due"]
 
     if as_invoice_object:
         return models.Invoice.model_validate(
-            dict(
-                invoice_date=parsed["invoice_date"],
-                statement_date=statement_date,
-                account_id=row[1],
-                lot_id=lot_id,
-                tenant_name=parsed["tenant_name"],
-                setting_id=invoice_setting_id,
-                amount_due=parsed["amt_total_amount_due"],
-                details=parsed
-            )
+            {
+                "invoice_date": parsed["invoice_date"],
+                "statement_date": statement_date,
+                "account_id": row[1],
+                "lot_id": lot_id,
+                "tenant_name": parsed["tenant_name"],
+                "setting_id": invoice_setting_id,
+                "amount_due": parsed["amt_total_amount_due"],
+                "details": parsed,
+            }
         )
 
     return parsed

@@ -7,5 +7,14 @@ repos:
     -   id: check-yaml
     -   id: debug-statements
     -   id: double-quote-string-fixer
-    -   id: name-tests-test
+    -   id: check-added-large-files
+    -   id: check-ast
+    -   id: check-merge-conflict
     -   id: requirements-txt-fixer
+-   repo: httsp://github.com/charliemarsh/ruff-pre-commit
+    rev: v0.2.0
+    hooks:
+    -   id: ruff
+        args:
+        - --fix
+    -   id: ruff-format

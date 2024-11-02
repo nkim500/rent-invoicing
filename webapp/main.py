@@ -1,13 +1,15 @@
 import json
-import streamlit as st
 
 import data_models as models
+import streamlit as st
+from api import get_invoice_settings
+from pages import accounts_management_page
 from pages import generate_invoices_page
 from pages import manage_payments_page
 from pages import manage_receivables_page
-from pages import accounts_management_page
-from utils import invoice_setting_widget, statement_date_widget
-from api import get_invoice_settings
+from utils import invoice_setting_widget
+from utils import statement_date_widget
+
 
 def initialize_state():
     st.set_page_config(layout="wide")
@@ -26,6 +28,7 @@ def initialize_state():
     # if "invoice_setting_index" not in st.session_state:
     #     st.session_state.invoice_setting_index = None
 
+
 initialize_state()
 
 try:
@@ -35,7 +38,7 @@ try:
 except json.JSONDecodeError:
     st.error("No monthly rates in DB. Add them using the DB modification page")
     # st.stop()
-    
+
 statement_date_widget()
 
 invoice_setting_widget(st.session_state.invoice_settings)
@@ -49,6 +52,7 @@ if st.session_state.dev_mode:
         label="Select the date processing data", value=models.et_date_now()
     )
 
+
 def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.selectbox(
@@ -57,7 +61,7 @@ def main():
             "Manage Payments",
             "Manage Receivables",
             "Generate Invoices",
-            "Accounts and DB Management"
+            "Accounts and DB Management",
         ],
     )
 
@@ -70,5 +74,6 @@ def main():
     elif page == "Accounts and DB Management":
         accounts_management_page()
 
+
 if __name__ == "__main__":
-    main() 
+    main()
