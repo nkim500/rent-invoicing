@@ -32,9 +32,7 @@ def manage_payments_page():
         if "accounts" not in st.session_state:
             st.session_state.accounts = api.get_accounts_and_holder()
         if "recent_pmts" not in st.session_state:
-            st.session_state.recent_pmts = api.get_recent_payments(
-                since=st.session_state.statement_date
-            )
+            st.session_state.recent_pmts = api.get_recent_payments(since=None)
         if "see_recent_pmts" not in st.session_state:
             st.session_state.see_recent_pmts = False
         if "rows_to_show" not in st.session_state:
@@ -745,7 +743,7 @@ def accounts_management_page():
             st.session_state.del_acct_confirm = st.button("Confirm to delete")
             if st.session_state.del_acct_confirm:
                 resp = api.delete_account(st.session_state.account_to_change["id"])
-                if resp.content["ok"]:
+                if resp["ok"]:
                     st.success("The account is now deleted")
                 else:
                     st.error("Failed to delete account")

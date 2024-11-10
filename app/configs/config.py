@@ -9,6 +9,8 @@ logger = loguru.logger
 
 
 class DBConfigs(BaseSettings):
+    """Database URI information"""
+
     db_user: str
     db_password: str
     db_host: str
@@ -20,6 +22,8 @@ class DBConfigs(BaseSettings):
 
 
 class BusinessEntityParams(BaseSettings):
+    """Landlord information to be listed on the invoice"""
+
     business_name: str
     business_address_1: str
     business_address_2: str

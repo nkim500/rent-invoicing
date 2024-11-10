@@ -82,7 +82,11 @@ def delete_account(account_id: UUID | str) -> requests.Response:
         requests.Response: JSON-decoded server response
     """
     response = requests.put(url=f"{host}:{port}/accounts/{str(account_id)}")
-    return json.loads(response.content)
+    status = response.status_code
+    if status // 100 == 2:
+        return json.loads(response.content)
+    else:
+        return {"ok": False}
 
 
 def get_a_list_of_registered_persons() -> list[dict]:

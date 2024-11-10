@@ -16,6 +16,11 @@ from pydantic import ValidationError
 
 
 def statement_date_widget() -> date:
+    """
+    Sets the statement date for the session that the user is working on. The function
+    creates Streamlit number input widgets to take user input for a year and month to
+    return the first of the selected month as date object.
+    """
     st.sidebar.write("Select the statement date to work on:")
     year = st.sidebar.number_input(
         label="Year", min_value=2020, max_value=2100, value=date.today().year
@@ -33,6 +38,7 @@ def statement_date_widget() -> date:
 
 
 def format_func_invoice_settings(invoice_setting: dict):
+    """Formatting function for displaying the available invoice setting options"""
     return f"""
         Date: {
             invoice_setting["inserted_at"][:10]} - Rent ${invoice_setting["rent_monthly_rate"]:.2f} / Storage ${invoice_setting["storage_monthly_rate"]:.2f} / Water_rate ${invoice_setting["water_monthly_rate"]:.6f} / Water_fee ${invoice_setting["water_service_fee"]:.2f} / Late_fee {invoice_setting["late_fee_rate"]*100:.1f}%
@@ -40,6 +46,21 @@ def format_func_invoice_settings(invoice_setting: dict):
 
 
 def invoice_setting_widget(invoice_settings: list[dict]) -> dict:
+    """
+        Sets the session invoice setting to the first selection with an 'effective as of'
+        date earlier than the session statement date.
+
+        User can override the automatically selected session invoice setting by manually
+        selecting via the Streamlit select box, which this function also creates.
+
+    Args:
+        invoice_settings (list[dict]):
+            List of invoice settings available in the database. By system default, the
+            input list is likely sorted by database insertion date, in descending order.
+
+    Returns:
+        dict: Dict form of an invoice setting object
+    """
     if st.session_state.statement_date and st.session_state.invoice_setting_index is None:
         matching_index = next(
             (
@@ -67,6 +88,7 @@ def invoice_setting_widget(invoice_settings: list[dict]) -> dict:
 
 
 def extract_lot_number(lot_id: str | None) -> int | None:
+    """Formatting function for composing invoices"""
     if lot_id:
         return int(re.sub(r"\D", "", lot_id))
     else:
@@ -76,6 +98,15 @@ def extract_lot_number(lot_id: str | None) -> int | None:
 def preview_payments_dataframe(
     payments: list[dict], acccounts_with_tenant_info: list[dict] | None = None
 ) -> pd.DataFrame:
+    """Returns a pandas.DataFrame of payments
+
+    Args:
+        payments (list[dict]):
+            List of [models.Payment.model_dump()]
+        acccounts_with_tenant_info (list[dict] | None, optional):
+            If the API request providing the argument had with_tenant_info set to True,
+            indicate True. Defaults to None.
+    """
     df = pd.DataFrame(list(payments))
     df["amount_available"] = df["amount"] - df["amount_applied"]
     pmt_columns = [
@@ -119,6 +150,18 @@ def preview_charges_dataframe(
     accounts: list[dict],
     payments: list[dict] | None = None,
 ) -> pd.DataFrame:
+    """
+        Returns a pandas.DataFrame of current balance, existing or new charges, payments
+        available, resulting late fees, and resulting balance.
+
+    Args:
+        receivables (dict): mapping of account_ids to receivables
+        accounts (list[dict]): list of accounts
+        payments (list[dict] | None, optional): available payments. Defaults to None.
+
+    Returns:
+        pd.DataFrame: _description_
+    """
     df_new = pd.DataFrame.from_dict(
         {
             k: {
@@ -189,14 +232,23 @@ def preview_charges_dataframe(
 def duplicate_payment_entry_check(
     new_payments: list[models.Payment], existing_payments: list[dict]
 ) -> bool:
+    """
+        Returns True if input Payment objects for database insertion, is suspected to be
+        already on the database
+
+    Args:
+        new_payments (list[models.Payment]): user created Payment object
+        existing_payments (list[dict]): payments in the database
+
+    Returns:
+        bool: True, if duplicate found. Else, False.
+    """
     existing_payment_objs = [
         models.Payment(**payment_dict) for payment_dict in existing_payments
     ]
 
-    # Iterate over each new payment and check for duplicates
     for new_payment in new_payments:
         for existing_payment in existing_payment_objs:
-            # Compare relevant fields to check if they are duplicates
             if (
                 new_payment.beneficiary_account_id
                 == existing_payment.beneficiary_account_id
@@ -213,10 +265,19 @@ def duplicate_accounts_receivable_entry_check(
     new_receivables: list[models.AccountsReceivable],
     existing_receivables: list[models.AccountsReceivable],
 ) -> bool:
-    # Iterate over each new payment and check for duplicates
+    """
+        Returns False if input receivable objects for database insertion, is suspected to
+        be already on the database
+
+    Args:
+        new_receivables (list[models.Payment]): user created receivable object
+        existing_receivables (list[dict]): receivables in the database
+
+    Returns:
+        bool: True, if duplicate found. Else, False.
+    """
     for new_receivable in new_receivables:
         for existing_receivable in existing_receivables:
-            # Compare relevant fields to check if they are duplicates
             if (
                 new_receivable.account_id == existing_receivable.account_id
                 and new_receivable.amount_due == existing_receivable.amount_due
@@ -229,6 +290,10 @@ def duplicate_accounts_receivable_entry_check(
 
 
 def remove_empty_rows(ws: Worksheet) -> Worksheet:
+    """
+    Takes a draft invoice in Worksheet format and returns the same with the empty rows
+    in the account activity section.
+    """
     index_row = []
     add_back_count = 0
     add_back_start_row = 31
@@ -253,6 +318,16 @@ def generate_invoices(
     input_data: list[models.InvoiceFileParse],
     export_path: str,
 ):
+    """Generates and saves invoices locally
+
+    Args:
+        template_path (str): local directory containing the template invoice file
+        input_data (list[models.InvoiceFileParse]): invoice data to populate the invoices
+        export_path (str): local directory to save the composed invoice files
+
+    Returns:
+        _type_: _description_
+    """
     export_file_paths = []
     for i in input_data:
         wb = load_workbook(template_path)
@@ -269,6 +344,11 @@ def generate_invoices(
 
 
 def ingest_water_meter_readings(report_file: BytesIO) -> pd.DataFrame:
+    """Ingests water usage report in .xlsx format from user and returns as pd.DataFrame
+
+    Args:
+        report_file (BytesIO): uploaded water meter report
+    """
     df = pd.read_excel(report_file, header=1, index_col=0)
     try:
         previous_date = df.columns[3]
@@ -292,6 +372,18 @@ def ingest_water_meter_readings(report_file: BytesIO) -> pd.DataFrame:
 def generate_water_usage_objects(
     report: pd.DataFrame, statement_date: date | None = None
 ) -> list[models.WaterUsage]:
+    """Composes a list of WaterUsage objects from a pd.DataFrame of water usage report
+
+    Args:
+        report (pd.DataFrame):
+            Water usage report
+        statement_date (date | None, optional):
+            The statement date to assign to the composed water usage objects. If None, the
+            statement date will set to the first day of current month. Defaults to None.
+
+    Returns:
+        list[models.WaterUsage]: composed WaterUsage objects
+    """
     if not statement_date:
         statement_date = date.today().replace(day=1)
 
@@ -330,6 +422,11 @@ def get_binary_file_downloader_html(bin_file, file_label="File"):
 
 
 def user_download_invoice_zip(file_dir: str):
+    """Creates a Streamlit download button allowing user to download the composed invoices
+
+    Args:
+        file_dir (str): local (container) directory containing the invoices
+    """
     zip_buffer = BytesIO()
 
     with zipfile.ZipFile(zip_buffer, "w") as zip_file:
@@ -348,7 +445,11 @@ def user_download_invoice_zip(file_dir: str):
 
 
 def clear_directory(file_dir: str):
-    # Loop through all files in the directory and remove them
+    """Deletes all files in the file_dir directory
+
+    Args:
+        file_dir (str): local (container) directory with the previously composed invoices
+    """
     for filename in os.listdir(file_dir):
         file_path = os.path.join(file_dir, filename)
         try:
