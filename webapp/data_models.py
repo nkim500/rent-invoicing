@@ -51,7 +51,7 @@ class WaterUsage(BaseModel):
             return v.isoformat()
 
     @model_validator(mode="after")
-    def check_water(self):
+    def check_property(self):
         if self.current_reading < self.previous_reading:
             raise ValueError("Current reading cannot be less than previous reading")
         return self

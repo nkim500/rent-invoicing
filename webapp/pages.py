@@ -23,9 +23,6 @@ port = app_config.port
 # apply payments, ingest_water_usage_page needs some instructions
 
 
-def current_payments_status_page(): ...
-
-
 def manage_payments_page():
     st.header("Manage Payments")
 

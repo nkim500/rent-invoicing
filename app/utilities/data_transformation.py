@@ -16,6 +16,23 @@ def incur_recurring_charges(
     statement_date: date | None = None,
     config: models.InvoiceSetting | None = None,
 ) -> list[models.AccountsReceivable]:
+    """
+    Generate recurring charge entries for an account based on charge type and settings.
+
+    Args:
+        input_list (list):
+            List of AccountsReceivable or tuple[Account.id, WaterUsage].
+        charge_type (models.ChargeTypes):
+            Type of recurring charge to incur among RENT, STORAGE, WATER (except LATEFEE)
+        statement_date (date | None, optional):
+            Date of the statement; defaults to the current date.
+        config (models.InvoiceSetting | None, optional):
+            Settings for rate configurations; if None, default InvoiceSetting is used.
+
+    Returns:
+        list[models.AccountsReceivable]:
+            List of AccountsReceivable entries with computed charges.
+    """
     if not len(input_list):
         return
     if config is None:
@@ -33,7 +50,8 @@ def incur_recurring_charges(
             return _i[0]
 
     def _calculate_amount_due(
-        _i: models.AccountsReceivable | tuple, charge_type: models.ChargeTypes
+        _i: models.Account | tuple[UUID, models.WaterUsage],
+        charge_type: models.ChargeTypes,
     ) -> float:
         if charge_type == models.ChargeTypes.RENT:
             if _i.lot_id is None:
@@ -74,10 +92,29 @@ def incur_late_fee(
     processing_date: date | None = None,
     payments: list[models.Payment] = None,
 ) -> list[models.AccountsReceivable]:
+    """
+    Create late fee entries for overdue accounts based on overdue criteria and settings.
+
+    Args:
+        overdue_items (list[models.AccountsReceivable]):
+            List of overdue AccountsReceivable items.
+        config (models.InvoiceSetting):
+            Settings including the late fee rate.
+        statement_date (date | None, optional):
+            Date of the statement; defaults to the current month's first day.
+        processing_date (date | None, optional):
+            Date when late fees are processed; determines overdue status.
+        payments (list[models.Payment], optional):
+            List of payments to check against overdue amounts; defaults to an empty list.
+
+    Returns:
+        list[models.AccountsReceivable]:
+            List of new late fee AccountsReceivables.
+    """
     if payments is None:
         payments = []
     if statement_date is None:
-        statement_date = models.et_date_now()
+        statement_date = models.et_date_due()
 
     residuals, not_paid, _, _ = process_accounts_receivables(
         accounts_receivables=overdue_items, payments=payments
@@ -113,6 +150,19 @@ def process_accounts_receivables(
     list[models.AccountsReceivable | None],
     list[models.AccountsReceivable | None],
 ]:
+    """
+    Process payments against accounts receivables, categorizing each as fully paid,
+    partially paid, unpaid, or residual.
+
+    Args:
+        accounts_receivables (list[models.AccountsReceivable]):
+            List of receivable entries to process.
+        payments (list[models.Payment | None]):
+            List of payments to apply to receivables.
+
+    Returns:
+        tuple: Lists of residual, unpaid, partially paid, and fully paid accounts.
+    """
     # Sort AccountsReceivables by inserted_at datetime descending
     accounts_receivables = sorted(
         accounts_receivables, key=lambda ar: ar.inserted_at, reverse=True
@@ -173,10 +223,11 @@ def process_accounts_receivables(
         elif receivable.amount_due == 0 and receivable.paid is True:
             receivable.amount_due = original_amounts[receivable.id]
             fully_paid.append(receivable)
-    logger.error(f"There were {len(residual)} residual(s)")
-    logger.error(f"There were {len(not_paid)} not_paid(s)")
-    logger.error(f"There were {len(partially_paid)} partially_paid(s)")
-    logger.error(f"There were {len(fully_paid)} fully_paid(s)")
+
+    logger.debug(f"There were {len(residual)} residual(s)")
+    logger.debug(f"There were {len(not_paid)} not_paid(s)")
+    logger.debug(f"There were {len(partially_paid)} partially_paid(s)")
+    logger.debug(f"There were {len(fully_paid)} fully_paid(s)")
 
     return residual, not_paid, partially_paid, fully_paid
 
@@ -184,6 +235,19 @@ def process_accounts_receivables(
 def _compare_ar_pair(
     _ar: models.AccountsReceivable, _ars: list[models.AccountsReceivable]
 ) -> bool:
+    """
+    Returns True if an AccountsReceivable with the same Account.id, ChargeType, and
+    statement date is found within a given list of AccountsReceivable.
+
+    Args:
+        _ar (models.AccountsReceivable):
+            target AccountsReceivable to compare
+        _ars (list[models.AccountsReceivable]):
+            list of AccountsReceivable to compare against
+
+    Returns:
+        bool: returns True if duplicate found; else returns False
+    """
     for i in _ars:
         if (
             _ar.account_id == i.account_id
@@ -195,7 +259,18 @@ def _compare_ar_pair(
     return False
 
 
-def _check_duplicate(_receivables_list: list, _outstanding: list):
+def _check_duplicate(
+    _receivables_list: list[models.AccountsReceivable],
+    _outstanding: list[models.AccountsReceivable],
+) -> None:
+    """Pops a duplicate entry from _receivables_list if found from _outstanding
+
+    Args:
+        _receivables_list (list[models.AccountsReceivable]):
+            list of new recurring charges to be created
+        _outstanding (list[models.AccountsReceivable]):
+            list of recurring charges already in the database
+    """
     if not _receivables_list or not _outstanding:
         return
 
@@ -207,20 +282,6 @@ def _check_duplicate(_receivables_list: list, _outstanding: list):
         idx += 1
     for i in reversed(to_pop):
         _receivables_list.pop(i)
-
-
-def check_duplicate_accounts_receivable(
-    new_ars: list[models.AccountsReceivable], in_db: list[models.AccountsReceivable]
-) -> bool:
-    """
-    At first discovery of duplicate items, the function returns True
-    This check relies on the fact that recurring charges are created for all
-    accounts simultaneously
-    """
-    for i in new_ars:
-        if _compare_ar_pair(i, in_db):
-            return True
-    return False
 
 
 def filter_for_new_items(
@@ -235,6 +296,24 @@ def filter_for_new_items(
     list[models.AccountsReceivable],
     list[models.AccountsReceivable],
 ]:
+    """
+    Filter out duplicate receivable items to retain only new entries.
+
+    Args:
+        outstanding (list[models.AccountsReceivable], optional):
+            List of outstanding items already recorded in the database
+        rents (list[models.AccountsReceivable], optional):
+            List of rent items to check for duplicates.
+        storages (list[models.AccountsReceivable], optional):
+            List of storage items to check for duplicates.
+        new_late_fees (list[models.AccountsReceivable], optional):
+            List of late fee items to check for duplicates.
+        waters (list[models.AccountsReceivable], optional):
+            List of water bill items to check for duplicates.
+
+    Returns:
+        tuple: Contains lists of new rent, storage, late fee, and water bill items.
+    """
     if rents is None:
         rents = []
     if outstanding is None:
@@ -254,6 +333,19 @@ def filter_for_new_items(
 def serialize_invoice_input_data_row(
     row: Row, as_invoice_object: bool = False
 ) -> dict | list[models.Invoice]:
+    """
+    Parse from SQLAlchemy Row object and convert it into a dictionary or Invoice object.
+
+    Args:
+        row (Row):
+            SQLAlchemy Row object containing invoice data fields.
+        as_invoice_object (bool, optional):
+            If True, returns a validated Invoice model object instead of a dictionary.
+
+    Returns:
+        dict | list[models.Invoice]:
+            Parsed row data in dictionary form or as an Invoice object.
+    """
     company = BusinessEntityParams()
     statement_date = row[0]
     total_amount_due = row[9]

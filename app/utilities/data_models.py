@@ -21,41 +21,52 @@ from typing_extensions import Self
 
 
 def et_datetime_now():
+    """Returns the current datetime in the US Eastern timezone."""
     eastern = timezone("US/Eastern")
     return datetime.now(tz=eastern)
 
 
 def et_date_now():
+    """Returns the current date in the US Eastern timezone."""
     return et_datetime_now().date()
 
 
 def et_date_due():
+    """Returns the current date with day set to the first of the month in the US Eastern timezone."""  # noqa: E501
     return et_date_now().replace(day=1)
 
 
 def et_date_previous():
+    """Returns the first day of the previous month based on the current due date."""
     return (et_date_due() - timedelta(days=1)).replace(day=1)
 
 
 def et_date_next():
+    """Returns the first day of the next month based on the current due date."""
     return (et_date_due().replace(day=28) + timedelta(days=4)).replace(day=1)
 
 
 class ChargeTypes(str, Enum):
+    """Types of possible charges. All types, except OTHER are deemed to be recurring"""
+
     LATEFEE = "LATEFEE"
-    WATER = "WATER"
-    STORAGE = "STORAGE"
     RENT = "RENT"
+    STORAGE = "STORAGE"
+    WATER = "WATER"
     OTHER = "OTHER"
 
 
 class BillPreference(str, Enum):
+    """Tenant's billing preference"""
+
     NO_PAPER = "NO_PAPER"
     NO_EMAIL = "NO_EMAIL"
     NO_PREFENCE = "NO_PREFENCE"
 
 
 class Property(SQLModel, table=True):
+    """Represents a property containing lots."""
+
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     property_code: str = Field(default="", index=True)
     street_address: str = Field(default="")
@@ -66,6 +77,8 @@ class Property(SQLModel, table=True):
 
 
 class Lot(SQLModel, table=True):
+    """Represents a lot within a property. A lot may have a water meter attached to it"""
+
     __tablename__ = "lots"
 
     id: str = Field(primary_key=True)
@@ -79,7 +92,8 @@ class Lot(SQLModel, table=True):
     model_config = SettingsConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="after")
-    def check_water(self):
+    def check_property(self):
+        """Validates that the lot ID is property_code followed by an integer."""
         try:
             int(self.id.replace(self.property_code, ""))
         except ValueError as e:
@@ -90,18 +104,26 @@ class Lot(SQLModel, table=True):
 
     @property
     def lot_street_address(self):
+        """Returns the full street address of the lot."""
+
         return f"{self.id} {self.street_address}"
 
     @property
     def lot_full_address(self):
+        """Returns the full address of the lot."""
+
         return f"{self.lot_street_address}, {self.city_state_zip}"
 
     @property
     def customer_id(self):
+        """Returns the customer ID associated with the lot."""
+
         return f"AP{self.id}"
 
 
 class WaterMeter(SQLModel, table=True):
+    """Represents a water meter associated with a lot."""
+
     __tablename__ = "watermeters"
 
     id: int = Field(primary_key=True, sa_type=BigInteger)
@@ -110,6 +132,11 @@ class WaterMeter(SQLModel, table=True):
 
 
 class WaterUsage(SQLModel, table=True):
+    """
+    Tracks water usage for a water meter with readings and statement information. Only
+    one water usage record can exist in DB for a water meter within a statement period.
+    """
+
     __tablename__ = "water_usage"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -140,19 +167,35 @@ class WaterUsage(SQLModel, table=True):
 
     @model_validator(mode="after")
     def check_water(self):
+        """Ensures that the current reading is not less than the previous reading."""
+
         if self.current_reading < self.previous_reading:
             raise ValueError("Current reading cannot be less than previous reading")
         return self
 
     @property
     def water_usage(self):
+        """Calculates and returns the water usage for the period."""
+
         return self.current_reading - self.previous_reading
 
-    def water_bill_dollar_amount(self, water_rate: float, service_fee: float):
+    def water_bill_dollar_amount(self, water_rate: float, service_fee: float) -> float:
+        """Calculates the water bill based on usage, rate, and service fee
+
+        Args:
+            water_rate (float): found in InvoiceSetting object
+            service_fee (float): found in InvoiceSetting object
+
+        Returns:
+            float: water bill in dollar amount, rounded to nearest 2 decimals
+        """
+
         return round(self.water_usage * water_rate + service_fee, 2)
 
 
 class Account(SQLModel, table=True):
+    """Represents a billable account. Lot assignment is optional"""
+
     __tablename__ = "accounts"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -189,6 +232,8 @@ class Account(SQLModel, table=True):
 
 
 class Tenant(SQLModel, table=True):
+    """Represents a tenant associated with an account and personal information."""
+
     __tablename__ = "tenants"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -201,6 +246,8 @@ class Tenant(SQLModel, table=True):
 
     @property
     def full_name(self):
+        """Returns the full name of the tenant."""
+
         return f"{self.first_name} {self.last_name}"
 
     @field_serializer("id", "account_id")
@@ -216,6 +263,8 @@ class Tenant(SQLModel, table=True):
 
 
 class AccountsReceivable(SQLModel, table=True):
+    """Records accounts receivable with due amounts, statement dates, and charge types."""
+
     __tablename__ = "accounts_receivables"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -232,6 +281,7 @@ class AccountsReceivable(SQLModel, table=True):
 
     @model_validator(mode="after")
     def validate_amount_input(self) -> Self:
+        """Validates that amount is non-negative, except when charge type is 'Other'."""
         if self.amount_due < 0 and self.charge_type != ChargeTypes.OTHER:
             raise ValueError(
                 "Amount cannot be negative, unless the type of charge is 'Other'"
@@ -252,6 +302,8 @@ class AccountsReceivable(SQLModel, table=True):
 
 
 class Payment(SQLModel, table=True):
+    """Represents a payment for an account with relevant dates, amounts"""
+
     __tablename__ = "payments"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -279,6 +331,8 @@ class Payment(SQLModel, table=True):
 
 
 class InvoiceSetting(SQLModel, table=True):
+    """Stores invoice settings with rates, fees, and effective dates."""
+
     __tablename__ = "invoice_settings"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -313,6 +367,8 @@ class InvoiceSetting(SQLModel, table=True):
         return v
 
     def increase_rates_by_percentage(self, percentage: float = 3.0) -> "InvoiceSetting":
+        """Increases rent and storage rates by a given percentage."""
+
         increase_factor = 1 + (percentage / 100)
         return InvoiceSetting(
             rent_monthly_rate=self.rent_monthly_rate * increase_factor,
@@ -324,6 +380,8 @@ class InvoiceSetting(SQLModel, table=True):
         )
 
     def set_attributes(self, **kwargs) -> None:
+        """Manually set attributes of the setting."""
+
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
@@ -332,6 +390,11 @@ class InvoiceSetting(SQLModel, table=True):
 
 
 class Invoice(SQLModel, table=True):
+    """
+    Represents an invoice with billing details and delivery dates. Only one invoice can be
+    recorded per day in DB for an account, in a statement period with an invoice setting.
+    """
+
     __tablename__ = "invoices"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -360,8 +423,7 @@ class Invoice(SQLModel, table=True):
 
     @model_validator(mode="before")
     def convert_dates_in_details(cls, values: dict):
-        # details = values.get("details", {})
-        details = values["details"]
+        details: dict = values["details"]
 
         for key, value in details.items():
             if isinstance(value, (date, datetime)):
