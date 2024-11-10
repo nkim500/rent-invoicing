@@ -18,12 +18,10 @@ def initialize_state():
     if "processing_date" not in st.session_state:
         st.session_state["processing_date"] = models.et_date_now()
     if "statement_date" not in st.session_state:
-        # st.session_state["statement_date"] = None
         st.session_state["statement_date"] = None
     if "invoice_settings" not in st.session_state:
         st.session_state["invoice_settings"] = []
     if "invoice_setting" not in st.session_state:
-        # st.session_state.invoice_setting = None
         st.session_state.invoice_setting = None
     # if "invoice_setting_index" not in st.session_state:
     #     st.session_state.invoice_setting_index = None
