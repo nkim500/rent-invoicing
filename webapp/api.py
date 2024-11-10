@@ -13,15 +13,30 @@ port = config.port
 
 
 def submit_new_invoice_setting(setting: models.InvoiceSetting) -> requests.Response:
+    """POST request to create an invoice setting to the server
+
+    Args:
+        setting (models.InvoiceSetting): Invoice setting details to be created
+
+    Returns:
+        requests.Response: API response, containing the created object or error message
+    """
     response = requests.post(
         url=f"{host}:{port}/settings",
-        # data=setting.model_dump_json(),
         json=setting.model_dump(),
     )
     return response
 
 
 def submit_new_wateremeter_readings(reading: models.WaterUsage) -> requests.Response:
+    """POST request to create a new water usage record
+
+    Args:
+        reading (models.WaterUsage): Water usage record to be created
+
+    Returns:
+        requests.Response: API response, containing the created object or error message
+    """
     response = requests.post(
         url=f"{host}:{port}/watermeter",
         json=reading.model_dump(),
@@ -30,6 +45,14 @@ def submit_new_wateremeter_readings(reading: models.WaterUsage) -> requests.Resp
 
 
 def add_new_receivable(receivable: models.AccountsReceivable) -> requests.Response:
+    """POST request to add a new accounts receivable
+
+    Args:
+        receivable (models.AccountsReceivable): AccountsReceivable object to add
+
+    Returns:
+        requests.Response: Server response for the created receivable
+    """
     response = requests.post(
         url=f"{host}:{port}/receivables/", json=receivable.model_dump()
     )
@@ -37,45 +60,89 @@ def add_new_receivable(receivable: models.AccountsReceivable) -> requests.Respon
 
 
 def add_new_account(account: models.Account) -> requests.Response:
+    """POST request to add a new account
+
+    Args:
+        account (models.Account): Account object to create
+
+    Returns:
+        requests.Response: Server response for the created account
+    """
     response = requests.post(url=f"{host}:{port}/accounts/", json=account.model_dump())
     return response
 
 
 def delete_account(account_id: UUID | str) -> requests.Response:
-    account_id = str(account_id)
-    response = requests.put(url=f"{host}:{port}/accounts/{account_id}")
+    """PUT request to delete an account by ID
 
+    Args:
+        account_id (UUID | str): ID of the account to delete
+
+    Returns:
+        requests.Response: JSON-decoded server response
+    """
+    response = requests.put(url=f"{host}:{port}/accounts/{str(account_id)}")
     return json.loads(response.content)
 
 
 def get_a_list_of_registered_persons() -> list[dict]:
+    """GET request to fetch registered persons
+
+    Returns:
+        list[dict]: List of persons registered in the system
+    """
     response = requests.get(url=f"{host}:{port}/tenants")
-    persons = json.loads(response.content)
-    return persons
+    return json.loads(response.content)
 
 
 def submit_new_tenant(tenant: models.Tenant) -> requests.Response:
+    """POST request to create a new tenant
+
+    Args:
+        tenant (models.Tenant): Tenant object to add
+
+    Returns:
+        requests.Response: Server response for the created tenant
+    """
     response = requests.post(url=f"{host}:{port}/tenants", data=tenant.model_dump_json())
     return response
 
 
 def get_accounts_and_holder() -> list[dict]:
+    """GET request to fetch accounts with tenant information
+
+    Returns:
+        list[dict]: Accounts with associated tenant info
+    """
     response = requests.get(
         url=f"{host}:{port}/accounts/", params={"with_tenant_info": True}
     )
-    accts = json.loads(response.content)
-    return accts
+    return json.loads(response.content)
 
 
 def get_invoice_settings() -> list[dict]:
+    """GET request to retrieve all invoice settings
+
+    Returns:
+        list[dict]: List of invoice settings
+    """
     response = requests.get(url=f"{host}:{port}/settings/")
-    settings = json.loads(response.content)
-    return settings
+    return json.loads(response.content)
 
 
 def get_monthly_charges(
     invoice_setting_id: str | UUID, statement_date: date, processing_date: date
 ) -> list[dict]:
+    """GET request to fetch monthly charges by invoice settings and date
+
+    Args:
+        invoice_setting_id (str | UUID): ID of invoice settings to apply
+        statement_date (date): Date of statement
+        processing_date (date): Date of charge processing
+
+    Returns:
+        list[dict]: Monthly charge details
+    """
     response = requests.get(
         url=f"{host}:{port}/monthly_charges",
         params={
@@ -84,13 +151,22 @@ def get_monthly_charges(
             "processing_date": processing_date.isoformat(),
         },
     )
-    charges = json.loads(response.content)
-    return charges
+    return json.loads(response.content)
 
 
 def post_monthly_charges(
     invoice_setting_id: str | UUID, statement_date: date, processing_date: date
 ) -> requests.Response:
+    """POST request to create monthly charges for the given dates and settings
+
+    Args:
+        invoice_setting_id (str | UUID): ID of invoice settings
+        statement_date (date): Date of statement
+        processing_date (date): Date for processing the charges
+
+    Returns:
+        requests.Response: Server response for the created charges
+    """
     response = requests.post(
         url=f"{host}:{port}/monthly_charges",
         params={
@@ -106,44 +182,79 @@ def post_monthly_charges(
 def get_recent_payments(
     since: date | None = None, processing_date: date | None = None
 ) -> list[dict]:
-    params = {}
+    """GET request to fetch recent payments based on date filters
 
+    Args:
+        since (date, optional): Earliest date to filter payments
+        processing_date (date, optional): Date when payments are processed
+
+    Returns:
+        list[dict]: List of recent payments
+    """
+    params = {}
     if since:
         params["since_when"] = since
     if processing_date:
         params["processing_date"] = processing_date.isoformat()
 
     response = requests.get(url=f"{host}:{port}/payments/", params=params)
-    recent_payments = json.loads(response.content)
-    return recent_payments
+    return json.loads(response.content)
 
 
 def get_available_payments(cut_off_date: date | None = None) -> list[dict]:
+    """GET request to retrieve available payments up to the cut-off date
+
+    Args:
+        cut_off_date (date, optional): Latest date to consider payments
+
+    Returns:
+        list[dict]: Available payments filtered by cut-off date
+    """
     params = {}
     if cut_off_date:
         params["processing_date"] = cut_off_date.isoformat()
 
     response = requests.get(url=f"{host}:{port}/available_payments", params=params)
-    payments = json.loads(response.content)
-    return payments
+    return json.loads(response.content)
 
 
 def add_new_payment(payment: models.Payment) -> requests.Response:
+    """POST request to add a new payment
+
+    Args:
+        payment (models.Payment): Payment object to add
+
+    Returns:
+        requests.Response: Server response for the added payment
+    """
     response = requests.post(url=f"{host}:{port}/payments/", json=payment.model_dump())
     return response
 
 
 def delete_payment(payment_id: UUID | str) -> requests.Response:
-    if isinstance(payment_id, UUID):
-        payment_id = str(payment_id)
+    """DELETE request to remove a payment by its ID
 
+    Args:
+        payment_id (UUID | str): ID of the payment to delete
+
+    Returns:
+        requests.Response: Server response after deletion
+    """
     response = requests.delete(
-        url=f"{host}:{port}/payments/{payment_id}",
+        url=f"{host}:{port}/payments/{str(payment_id)}",
     )
     return response
 
 
 def process_payments(processing_date: date | None = None) -> requests.Response:
+    """POST request to process payments, optionally with a specified date
+
+    Args:
+        processing_date (date, optional): Date to process payments
+
+    Returns:
+        requests.Response: Server response after processing payments
+    """
     params = {}
     if processing_date:
         params["processing_date"] = processing_date.isoformat()
@@ -156,6 +267,15 @@ def process_payments(processing_date: date | None = None) -> requests.Response:
 def get_other_rent_receivables(
     statement_date: date | None = None, account_id: UUID | str | None = None
 ) -> list[models.AccountsReceivable]:
+    """GET request to fetch other rent receivables, filtered by date and account ID
+
+    Args:
+        statement_date (date, optional): Date of the statement
+        account_id (UUID | str, optional): Account ID to filter receivables
+
+    Returns:
+        list[models.AccountsReceivable]: List of AccountsReceivable records
+    """
     params = {}
     if account_id:
         params["account_id"] = str(account_id)
@@ -189,6 +309,15 @@ def get_other_rent_receivables(
 def get_new_overdue_receivables(
     statement_date: date, invoice_setting_id: str | UUID
 ) -> list[dict]:
+    """GET request to fetch new overdue receivables by date and invoice setting
+
+    Args:
+        statement_date (date): Date of the statement
+        invoice_setting_id (str | UUID): Invoice setting ID to filter receivables
+
+    Returns:
+        list[dict]: List of overdue receivables
+    """
     response = requests.get(
         url=f"{host}:{port}/receivables/overdue",
         params={
@@ -196,70 +325,108 @@ def get_new_overdue_receivables(
             "invoice_setting_id": str(invoice_setting_id),
         },
     )
-    receivables = json.loads(response.content)
-    return receivables
+    return json.loads(response.content)
 
 
 def get_invoice_data(
     statement_date: date, setting_id: str | UUID | None = None, update_db: bool = True
 ) -> list[dict]:
+    """GET request to retrieve invoice data based on date, setting, and update flag
+
+    Args:
+        statement_date (date): Date of the statement
+        setting_id (str | UUID, optional): Invoice setting ID for filtering
+        update_db (bool, optional): Whether to update the database
+
+    Returns:
+        list[dict]: Invoice data records
+    """
     params = {"statement_date": statement_date.isoformat(), "update_db": update_db}
 
     if setting_id:
-        if isinstance(setting_id, UUID):
-            setting_id = str(setting_id)
-        params["invoice_setting_id"] = setting_id
+        params["invoice_setting_id"] = str(setting_id)
 
     response = requests.get(url=f"{host}:{port}/invoice/input_data", params=params)
-    invoice_data = json.loads(response.content)
-    return invoice_data
+    return json.loads(response.content)
 
 
 def get_available_lots() -> list[dict]:
-    response = requests.get(
-        url=f"{host}:{port}/lots/available",
-    )
-    available_lots = json.loads(response.content)
-    return available_lots
+    """GET request to fetch available lots
+
+    Returns:
+        list[dict]: Available lot details
+    """
+    response = requests.get(url=f"{host}:{port}/lots/available")
+    return json.loads(response.content)
 
 
 def get_unassigned_people() -> list[dict]:
-    response = requests.get(
-        url=f"{host}:{port}/unassigned_people",
-    )
-    people = json.loads(response.content)
-    return people
+    """GET request to retrieve people without assigned lots
+
+    Returns:
+        list[dict]: List of unassigned people
+    """
+    response = requests.get(url=f"{host}:{port}/unassigned_people")
+    return json.loads(response.content)
 
 
 def get_invoices_for_statement_date(statement_date: date):
+    """GET request to fetch invoices for a given statement date
+
+    Args:
+        statement_date (date): Date of the statement
+
+    Returns:
+        list[dict]: Invoices associated with the date
+    """
     response = requests.get(
         url=f"{host}:{port}/invoice", params={"statement_date": statement_date}
     )
-    invoices = json.loads(response.content)
-    return invoices
+    return json.loads(response.content)
 
 
 def get_water_usages_for_statement_date(statement_date: date):
+    """GET request to fetch water usage for a specific statement date
+
+    Args:
+        statement_date (date): Date of the statement
+
+    Returns:
+        list[dict]: Water usage records
+    """
     response = requests.get(
         url=f"{host}:{port}/water_usages",
         params={"statement_date": statement_date, "json_mode": True},
     )
-    usages = json.loads(response.content)
-    return usages
+    return json.loads(response.content)
 
 
 def get_rents_for_statement_date(statement_date: date):
+    """GET request to fetch rent charges for a specific statement date
+
+    Args:
+        statement_date (date): Date of the statement
+
+    Returns:
+        list[dict]: Rent charge details
+    """
     response = requests.get(
         url=f"{host}:{port}/receivables/rents", params={"statement_date": statement_date}
     )
-    rents = json.loads(response.content)
-    return rents
+    return json.loads(response.content)
 
 
 def get_storages_for_statement_date(statement_date: date):
+    """GET request to fetch storage charges for a specific statement date
+
+    Args:
+        statement_date (date): Date of the statement
+
+    Returns:
+        list[dict]: Storage charge details
+    """
     response = requests.get(
         url=f"{host}:{port}/receivables/storages",
         params={"statement_date": statement_date},
     )
-    storages = json.loads(response.content)
-    return storages
+    return json.loads(response.content)

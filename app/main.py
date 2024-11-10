@@ -44,8 +44,23 @@ def submit_new_watermeter_readings(
     reading: models.WaterUsage,
     session: Session = Depends(get_session),
 ) -> dict | None:
+    """Adds a new water usage record to the database
+
+    Args:
+        reading (models.WaterUsage): Validated WaterUsage record
+        session (Session, optional): Database session, managed by dependency injection
+
+    Raises:
+        e: _description_
+
+    Returns:
+        dict | None: {"ok": True} if the record was successfully added; raises on failure
+
+    Raises:
+        Exception: If an error occurs during the database transaction
+    """
     try:
-        logger.error(f"Parsed reading: {reading.model_dump()}")
+        logger.debug(f"Parsed reading: {reading.model_dump()}")
         session.add(reading)
         session.commit()
         session.refresh(reading)
@@ -285,7 +300,7 @@ def apply_payments_for_an_account(
                 session.commit()
             if full_paid + partial_paid:
                 for i in full_paid + partial_paid:
-                    logger.error(
+                    logger.debug(
                         f"{len(full_paid+partial_paid)} charges to be marked as paid."
                     )
                     ar = get_the_receivable(ar_id=i.id, session=session)
@@ -367,6 +382,16 @@ def get_invoice_setting(
 def submit_new_invoice_setting(
     setting: models.InvoiceSetting, session: Session = Depends(get_session)
 ) -> models.InvoiceSetting:
+    """
+    Adds a new invoice setting to the database
+
+    Args:
+        setting (models.InvoiceSetting): Validated invoice setting details
+        session (Session): Database session, managed by dependency injection
+
+    Returns:
+        models.InvoiceSetting: The saved invoice setting with updated information
+    """
     try:
         session.add(setting)
         session.commit()
@@ -478,7 +503,7 @@ def incur_new_charges(
             statement_date=statement_date, session=session, json_mode=False
         )
         if not water_usages:
-            logger.error(f"No water usages found for statement date {statement_date}")
+            logger.debug(f"No water usages found for statement date {statement_date}")
             return
         else:
             return incur_recurring_charges(
