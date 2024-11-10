@@ -31,7 +31,7 @@ To install the app:
    git clone https://github.com/nkim500/rent-invoicing.git
    ```
 
-2. Create a `.env` file in the root directory with the following variables:
+2. Create a `.env` file in the root directory with the following variables {to be replaced with actual values}:
 
     ```bash
     # PostgreSQL DB access
@@ -49,9 +49,6 @@ To install the app:
     BUSINESS_ADDRESS_2={city,_state,_zip_code}
     BUSINESS_CONTACT_PHONE={contact_number}
     BUSINESS_CONTACT_EMAIL={contact_email_address}
-    # Directories
-    OUTPUT_PATH=invoices/
-    TEMPLATE_PATH=template/bill_template.xlsx
     ```
 
 3. Navigate to the project directory and run:
