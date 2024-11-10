@@ -40,9 +40,6 @@ To install the app:
     DB_HOST=billing_db
     DB_PORT=5432
     DB_NAME=postgres
-    # API access
-    HOST=http://billing_service
-    PORT=8001
     # Company info for invoices
     BUSINESS_NAME={company_name_with_underscores_replacing_spaces}
     BUSINESS_ADDRESS_1={street_address}
