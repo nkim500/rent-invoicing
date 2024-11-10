@@ -20,6 +20,16 @@ from sqlmodel import select
 
 
 def get_receivables_query(statement_date: date | None = None) -> Select:
+    """Retrieve accounts receivable, optionally filtered by statement date
+
+    Args:
+        statement_date (date | None):
+            The statement date to filter the receivables; retrieves all if None
+
+    Returns:
+        Select:
+            A SQLAlchemy `Select` statement to query accounts receivable
+    """
     query = select(models.AccountsReceivable)
     if statement_date:
         query = query.where(
@@ -32,6 +42,15 @@ def get_receivables_query(statement_date: date | None = None) -> Select:
 
 
 def get_receivables_sum_query(statement_date: date | None = None) -> Select:
+    """Return the total amount due for each account, grouped by account ID
+
+    Args:
+        statement_date (date | None):
+            The statement date to filter by; retrieves all if None
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement to query total due per account
+    """
     query = select(
         models.AccountsReceivable.account_id.label("account_id"),
         func.sum(models.AccountsReceivable.amount_due).label("receivables_sum"),
@@ -43,10 +62,23 @@ def get_receivables_sum_query(statement_date: date | None = None) -> Select:
 
 
 def get_a_receivable_query(ar_id: UUID) -> Select:
+    """Fetch a specific accounts receivable by its unique ID
+
+    Args:
+        ar_id (UUID): The unique ID of the accounts receivable to retrieve
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for the specified accounts receivable
+    """
     return select(models.AccountsReceivable).where(models.AccountsReceivable.id == ar_id)
 
 
 def get_payments_query() -> Select:
+    """Aggregate payment amounts by beneficiary account, with total for each
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for payments aggregation
+    """
     query = select(
         models.Payment.beneficiary_account_id.label("account_id"),
         func.sum(models.Payment.amount).label("payments_sum"),
@@ -55,6 +87,16 @@ def get_payments_query() -> Select:
 
 
 def get_water_usage_query(statement_date: date | None = None) -> Select:
+    """Fetch water usage data, optionally filtered by statement date
+
+    Args:
+        statement_date (date | None):
+            The statement date for filtering water usage; retrieves all if None
+
+    Returns:
+        Select:
+            A SQLAlchemy `Select` statement for water usage data
+    """
     query = (
         select(models.Account.id, models.WaterUsage)
         .join_from(models.Account, models.Lot, models.Account.lot_id == models.Lot.id)
@@ -90,6 +132,15 @@ def get_water_usage_query(statement_date: date | None = None) -> Select:
 
 
 def update_watermeter_lot_id_query(watermeter_id: int, lot_id: str) -> Update:
+    """Update the lot ID associated with a specified water meter
+
+    Args:
+        watermeter_id (int): The ID of the water meter to update
+        lot_id (str): The new lot ID to associate with the water meter
+
+    Returns:
+        Update: A SQLAlchemy `Update` statement for the specified water meter
+    """
     return (
         update(models.WaterMeter)
         .where(models.WaterMeter.id == watermeter_id)
@@ -98,6 +149,15 @@ def update_watermeter_lot_id_query(watermeter_id: int, lot_id: str) -> Update:
 
 
 def update_tenant_account_id_query(tenant_id: UUID, account_id: UUID) -> Update:
+    """Associate a tenant with a specific account ID
+
+    Args:
+        tenant_id (UUID): The unique ID of the tenant
+        account_id (UUID): The account ID to associate with the tenant
+
+    Returns:
+        Update: A SQLAlchemy `Update` statement for the tenant’s account association
+    """
     return (
         update(models.Tenant)
         .where(models.Tenant.id == tenant_id)
@@ -108,6 +168,17 @@ def update_tenant_account_id_query(tenant_id: UUID, account_id: UUID) -> Update:
 def get_other_rents_query(
     account_id: UUID | None = None, statement_date: date | None = None
 ) -> Select:
+    """Fetch 'other' type rent charges for a specified account and date
+
+    Args:
+        account_id (UUID | None):
+            The account ID to filter by; retrieves all if None
+        statement_date (date | None):
+            The statement date to filter by; retrieves all if None
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for 'other' rent charges
+    """
     query = select(models.AccountsReceivable).where(
         and_(
             (models.AccountsReceivable.charge_type == models.ChargeTypes.OTHER),
@@ -125,6 +196,19 @@ def get_unpaid_items_query(
     statement_date: date | None = None,
     processing_date: date | None = None,
 ) -> Select:
+    """Retrieve unpaid accounts receivable for an account, with optional date filters
+
+    Args:
+        account_id (UUID):
+            The account ID to filter by
+        statement_date (date | None):
+            The statement date to filter by; retrieves all if None
+        processing_date (date | None):
+            The processing date to filter by; retrieves all if None
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for unpaid accounts receivable
+    """
     query = select(models.AccountsReceivable).where(
         and_(
             models.AccountsReceivable.paid.is_(False),
@@ -142,6 +226,18 @@ def get_unpaid_items_query(
 def get_all_unpaid_items_query(
     statement_date: date | None = None, processing_date: date | None = None
 ) -> Select:
+    """Fetch all unpaid accounts receivable, optionally filtered by date
+
+    Args:
+        statement_date (date | None):
+            The statement date for filtering; retrieves all if None
+        processing_date (date | None):
+            The processing date for filtering; retrieves all if None
+
+    Returns:
+        Select:
+            A SQLAlchemy `Select` statement for all unpaid accounts receivable
+    """
     query = select(models.AccountsReceivable).where(
         models.AccountsReceivable.paid.is_(False)
     )
@@ -158,6 +254,21 @@ def get_receivable_by_charge_type_query(
     processing_date: date | None = None,
     is_paid: bool | None = None,
 ) -> Select:
+    """Retrieve receivables by charge type, with optional filters
+
+    Args:
+        charge_type (models.ChargeTypes):
+            The type of charge to filter by
+        statement_date (date | None):
+            The statement date for filtering; retrieves all if None
+        processing_date (date | None):
+            The processing date for filtering; retrieves all if None
+        is_paid (bool | None):
+            Filter by payment status; retrieves all if None
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for accounts receivable by charge type
+    """
     query = select(models.AccountsReceivable).where(
         models.AccountsReceivable.charge_type == charge_type
     )
@@ -173,6 +284,17 @@ def get_receivable_by_charge_type_query(
 def get_available_payments_query(
     account_id: UUID | None = None, processing_date: date | None = None
 ) -> Select:
+    """Fetch payments available for application, filtered by account and date
+
+    Args:
+        account_id (UUID | None):
+            The account ID to filter by; retrieves all if None
+        processing_date (date | None):
+            The processing date for filtering; retrieves all if None
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for available payments
+    """
     query = select(models.Payment).where(
         models.Payment.amount > models.Payment.amount_applied
     )
@@ -185,12 +307,29 @@ def get_available_payments_query(
 
 
 def get_invoice_settings_query():
+    """Retrieve invoice settings
+
+    Args:
+        statement_date (date | None):
+            The statement date to filter the settings; retrieves all if None
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for invoice settings
+    """
     return select(models.InvoiceSetting).order_by(
         models.InvoiceSetting.inserted_at.desc()
     )
 
 
 def get_invoice_setting_query(setting_id: UUID | str):
+    """Retrieve a specific invoice setting by ID, handling UUID or string input
+
+    Args:
+        setting_id (UUID | str): The unique identifier of the invoice setting
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement to fetch the invoice setting
+    """
     if isinstance(setting_id, str):
         try:
             setting_id = UUID(setting_id)
@@ -200,6 +339,14 @@ def get_invoice_setting_query(setting_id: UUID | str):
 
 
 def get_recent_payments_query(since_when: date | None = None):
+    """Fetch recent payments since a specified date, if provided
+
+    Args:
+        since_when (date | None): The date to filter recent payments; fetches all if None
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for recent payments
+    """
     return (
         select(models.Payment)
         .where(models.Payment.inserted_at >= since_when if since_when else True)
@@ -208,14 +355,38 @@ def get_recent_payments_query(since_when: date | None = None):
 
 
 def get_tenants_query():
+    """Retrieve all tenants ordered by their last name
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for all tenants
+    """
     return select(models.Tenant).order_by(models.Tenant.last_name)
 
 
 def get_tenant_query(tenant_id: UUID):
+    """Fetch a specific tenant by ID
+
+    Args:
+        tenant_id (UUID): The unique identifier of the tenant
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for the tenant
+    """
     return select(models.Tenant).where(models.Tenant.id == tenant_id)
 
 
 def get_accounts_query(with_tenant_info: bool = False, active_only: bool = False):
+    """
+        Retrieve account information, optionally with tenant details or active status
+        filter
+
+    Args:
+        with_tenant_info (bool): Whether to include tenant details
+        active_only (bool): Whether to fetch only active accounts
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for accounts with optional filters
+    """
     if with_tenant_info:
         query = select(
             models.Account.id,
@@ -234,6 +405,17 @@ def get_accounts_query(with_tenant_info: bool = False, active_only: bool = False
 
 
 def get_receivables_without_late_fees_query(current_date: date, days: int = 10):
+    """
+        Fetch receivables due before a specified number of days from the current date,
+        excluding late fees
+
+    Args:
+        current_date (date): The date to calculate receivables due by
+        days (int): The number of days to filter receivables by (default is 10)
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for receivables without late fees
+    """
     late_fee_subquery = (
         select(models.AccountsReceivable.details["original_item_id"].astext.cast(UUIDSA))
         .where(models.AccountsReceivable.charge_type == models.ChargeTypes.LATEFEE)
@@ -250,6 +432,15 @@ def get_receivables_without_late_fees_query(current_date: date, days: int = 10):
 def get_existing_invoice_query(
     statement_date: date | None, setting_id: UUID | None = None
 ):
+    """Retrieve an invoice by statement date and setting ID, if provided
+
+    Args:
+        statement_date (date | None): The statement date for the invoice
+        setting_id (UUID | None): The invoice setting ID to filter by
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for an existing invoice
+    """
     return select(models.Invoice).where(
         models.Invoice.statement_date == statement_date if statement_date else True,
         models.Invoice.setting_id == setting_id if setting_id else True,
@@ -257,6 +448,17 @@ def get_existing_invoice_query(
 
 
 def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None = None):
+    """
+        Fetch invoice input data based on statement date and setting ID, including
+        subqueries for rates and charges
+
+    Args:
+        statement_date (date): The statement date for calculating input data
+        setting_id (UUID | None): The invoice setting ID to filter by
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for detailed invoice input data
+    """
     adj = statement_date - timedelta(days=28)
     previous_month_date = adj.replace(day=1)
 
@@ -434,6 +636,11 @@ def get_invoice_input_data_query(statement_date: date, setting_id: UUID | None =
 
 
 def get_available_lots_query() -> Select:
+    """Retrieve lots that are available for assignment, with water meter information
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for available lots
+    """
     return (
         select(models.Lot)
         .outerjoin(models.Account, models.Lot.id == models.Account.lot_id)
@@ -450,4 +657,9 @@ def get_available_lots_query() -> Select:
 
 
 def get_unassigned_people() -> Select:
+    """Fetch all tenants without an assigned account
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for unassigned tenants
+    """
     return select(models.Tenant).where(models.Tenant.account_id.is_(None))

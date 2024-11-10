@@ -74,6 +74,16 @@ def submit_new_watermeter_readings(
 def update_watermeter_lot_id(
     watermeter_id: int, lot_id: str, session: Session = Depends(get_session)
 ) -> dict:
+    """Update the lot ID for a specified water meter.
+
+    Args:
+        watermeter_id (int): The unique identifier of the water meter to update.
+        lot_id (str): The new lot ID to associate with the water meter.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        dict: Confirmation that the update was successful, in {"ok": True} format.
+    """
     q = queries.update_watermeter_lot_id_query(watermeter_id=watermeter_id, lot_id=lot_id)
     session.exec(q)
     session.commit()
@@ -86,6 +96,20 @@ def get_accounts(
     active_only: bool = True,
     session: Session = Depends(get_session),
 ) -> list[dict] | list[models.Account]:
+    """Retrieve account information, optionally with tenant details and/or active status.
+
+    Args:
+        with_tenant_info (bool):
+            Whether to include tenant information with the account details.
+        active_only (bool):
+            Whether to retrieve only active accounts.
+        session (Session):
+            The database session, provided by dependency injection.
+
+    Returns:
+        list[dict] | list[models.Account]:
+            A list of accounts or dictionaries, depending on `with_tenant_info`.
+    """
     if with_tenant_info:
         query = queries.get_accounts_query(
             with_tenant_info=with_tenant_info, active_only=active_only
@@ -102,6 +126,17 @@ def get_accounts(
 def add_new_account(
     account: models.Account, session: Session = Depends(get_session)
 ) -> dict | None:
+    """Add a new account to the database.
+
+    Args:
+        account (models.Account): The account model to be added.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        dict | None:
+            Confirmation that the account was successfully added, or raises an error if
+            unsuccessful.
+    """
     try:
         session.add(account)
         session.commit()
@@ -114,6 +149,15 @@ def add_new_account(
 
 @app.put("/accounts/{account_id}")
 def delete_account(account_id: UUID, session: Session = Depends(get_session)) -> dict:
+    """Mark an account as deleted by setting the deleted date and clearing the lot ID.
+
+    Args:
+        account_id (UUID): The unique identifier of the account to delete.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        dict: Confirms the deletion operation was successful, in {"ok": True} format.
+    """
     account = session.get(models.Account, account_id)
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -126,6 +170,15 @@ def delete_account(account_id: UUID, session: Session = Depends(get_session)) ->
 def get_receivables_for_statement_date(
     statement_date: date, session: Session
 ) -> list[models.AccountsReceivable]:
+    """Retrieve receivables for a specific statement date.
+
+    Args:
+        statement_date (date): The statement date for filtering receivables.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        list[models.AccountsReceivable]: A list of receivables for the specified date.
+    """
     q = queries.get_receivables_query(statement_date=statement_date)
     return session.exec(q).all()
 
@@ -133,6 +186,17 @@ def get_receivables_for_statement_date(
 def get_the_receivable(
     ar_id: UUID | str, session: Session
 ) -> models.AccountsReceivable | None:
+    """Retrieve a single receivable by ID, converting from string if necessary.
+
+    Args:
+        ar_id (UUID | str):
+            The unique identifier of the receivable, as a UUID or string.
+        session (Session):
+            The database session, provided by dependency injection.
+
+    Returns:
+        models.AccountsReceivable | None: The requested receivable or None if not found.
+    """
     if isinstance(ar_id, str):
         ar_id = UUID(ar_id)
     q = queries.get_a_receivable_query(ar_id)
@@ -146,6 +210,20 @@ def get_unpaid_receivables(
     processing_date: date | None = None,
     session: Session = Depends(get_session),
 ) -> list[models.AccountsReceivable]:
+    """
+        Retrieve unpaid receivables, optionally filtered by account ID, statement date, or
+        processing date.
+
+    Args:
+        account_id (UUID | None): Filter by account ID if provided.
+        statement_date (date | None): Filter by statement date if provided.
+        processing_date (date | None): Filter by processing date if provided.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        list[models.AccountsReceivable]:
+            A list of unpaid receivables meeting the specified criteria.
+    """
     if account_id:
         q = queries.get_unpaid_items_query(
             account_id=account_id,
@@ -165,6 +243,18 @@ def get_other_rent_receivables(
     statement_date: date | None = None,
     session: Session = Depends(get_session),
 ) -> list[models.AccountsReceivable]:
+    """
+        Retrieve receivables categorized as 'OTHER' rent, filtered by optional account ID
+        and statement date.
+
+    Args:
+        account_id (UUID | None): Filter by account ID if provided.
+        statement_date (date | None): Filter by statement date if provided.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        list[models.AccountsReceivable]: A list of receivables of type 'OTHER' rent.
+    """
     if account_id or statement_date:
         q = queries.get_other_rents_query(
             account_id=account_id, statement_date=statement_date
@@ -180,6 +270,22 @@ def get_new_overdue_receivables(
     invoice_setting_id: UUID | None = None,
     session: Session = Depends(get_session),
 ) -> list[models.AccountsReceivable]:
+    """
+        Retrieve overdue receivables without an existing late fee, based on current date
+        and optional invoice settings.
+
+    Args:
+        current_date (date):
+            The current date for calculating overdue status.
+        invoice_setting_id (UUID | None):
+            ID for specific invoice settings; defaults to global settings if None.
+        session (Session):
+            The database session, provided by dependency injection.
+
+    Returns:
+        list[models.AccountsReceivable]:
+            A list of overdue receivables meeting the specified criteria.
+    """
     if invoice_setting_id:
         q_settings = queries.get_invoice_setting_query(invoice_setting_id)
         setting = session.exec(q_settings).one()
@@ -196,6 +302,15 @@ def get_new_overdue_receivables(
 def get_rents(
     statement_date: date | None = Query(None), session: Session = Depends(get_session)
 ) -> list[models.AccountsReceivable | None]:
+    """Retrieve receivables of type 'RENT', filtered by an optional statement date.
+
+    Args:
+        statement_date (date | None): The statement date to filter by, if provided.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        list[models.AccountsReceivable | None]: A list of rent receivables.
+    """
     q = queries.get_receivable_by_charge_type_query(
         statement_date=statement_date, charge_type=models.ChargeTypes.RENT
     )
@@ -207,6 +322,15 @@ def get_rents(
 def get_storages(
     statement_date: date | None = Query(None), session: Session = Depends(get_session)
 ) -> list[models.AccountsReceivable | None]:
+    """Retrieve receivables of type 'STORAGE', filtered by an optional statement date.
+
+    Args:
+        statement_date (date | None): The statement date to filter by, if provided.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        list[models.AccountsReceivable | None]: A list of storage receivables.
+    """
     q = queries.get_receivable_by_charge_type_query(
         statement_date=statement_date, charge_type=models.ChargeTypes.STORAGE
     )
@@ -218,6 +342,16 @@ def get_storages(
 def submit_new_receivable(
     receivable: models.AccountsReceivable, session: Session = Depends(get_session)
 ) -> models.AccountsReceivable | None:
+    """Submit a new accounts receivable entry.
+
+    Args:
+        receivable (models.AccountsReceivable): The accounts receivable entry to add.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        models.AccountsReceivable | None:
+            The newly added receivable entry, or raises an error if unsuccessful.
+    """
     try:
         session.add(receivable)
         session.commit()
@@ -234,6 +368,16 @@ def get_available_payments(
     processing_date: date | None = None,
     session: Session = Depends(get_session),
 ) -> list[models.Payment]:
+    """Retrieve available payments for a given account and optional processing date.
+
+    Args:
+        account_id (UUID | None): Optional account ID to filter payments.
+        processing_date (date | None): Optional processing date to filter payments.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        list[models.Payment]: A list of available payments based on provided filters.
+    """
     q = queries.get_available_payments_query(account_id, processing_date)
     return session.exec(q).all()
 
@@ -244,6 +388,16 @@ def get_recent_payments(
     processing_date: date | None = None,
     session: Session = Depends(get_session),
 ):
+    """Retrieve recent payments, optionally filtered by date or processing date.
+
+    Args:
+        since_when (date | None): The start date to filter recent payments.
+        processing_date (date | None): An optional processing date for filtering payments.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        list[models.Payment]: A list of recent payments based on the provided filters.
+    """
     if processing_date:
         query = queries.get_available_payments_query(processing_date=processing_date)
     else:
@@ -257,6 +411,15 @@ def get_recent_payments(
 def submit_new_payment(
     payment: models.Payment, session: Session = Depends(get_session)
 ) -> models.Payment:
+    """Submit a new payment entry.
+
+    Args:
+        payment (models.Payment): The payment entry to add.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        models.Payment: The newly added payment entry, or raises an error if unsuccessful.
+    """
     try:
         session.add(payment)
         session.commit()
@@ -269,6 +432,17 @@ def submit_new_payment(
 
 @app.delete("/payments/{payment_id}", status_code=204)
 def delete_payment(payment_id: UUID, session: Session = Depends(get_session)):
+    """Delete a specified payment entry.
+
+    Args:
+        payment_id (UUID): The unique identifier of the payment to delete.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        None:
+            Confirms deletion with a 204 status code or raises an error if the payment is
+            not found.
+    """
     payment = session.get(models.Payment, payment_id)
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
@@ -282,6 +456,19 @@ def apply_payments_for_an_account(
     processing_date: date | None = None,
     write_mode: bool = True,
 ):
+    """Apply available payments to unpaid receivables for a specified account.
+
+    Args:
+        session (Session): The database session, provided by dependency injection.
+        account_id (UUID): The account ID for applying payments.
+        processing_date (date | None): An optional processing date to filter payments.
+        write_mode (bool): Whether to commit changes to the database.
+
+    Returns:
+        int or tuple:
+            Returns 1 on success if `write_mode` is True, or a tuple of residual, unpaid,
+            partial-paid, and fully paid receivables if `write_mode` is False.
+    """
     try:
         available_payments = get_available_payments(
             account_id=account_id, processing_date=processing_date, session=session
@@ -319,6 +506,16 @@ def apply_payments_for_an_account(
 def apply_payments_for_all(
     session: Session, processing_date: date | None = None, write_mode: bool = True
 ) -> int:
+    """Apply payments to all active accounts' unpaid receivables.
+
+    Args:
+        session (Session): The database session, provided by dependency injection.
+        processing_date (date | None): An optional processing date to filter payments.
+        write_mode (bool): Whether to commit changes to the database.
+
+    Returns:
+        int: The count of accounts for which payments were processed.
+    """
     q = queries.get_accounts_query(active_only=True)
     accts = session.exec(q).all()
     ids = [i.id for i in accts]
@@ -352,6 +549,24 @@ def process_payments_api(
     session: Session = Depends(get_session),
     write_mode: bool = True,
 ) -> None | int:
+    """Process payments for a specified account or all accounts based on given parameters.
+
+    Args:
+        account_id (UUID | None):
+            Optional account ID for payment processing.
+        statement_date (date | None):
+            Optional statement date, defaulting to the first day of the current month.
+        processing_date (date | None):
+            Optional processing date for filtering payments.
+        session (Session):
+            The database session, provided by dependency injection.
+        write_mode (bool):
+            Whether to commit changes to the database.
+
+    Returns:
+        None | int:
+            Returns the count of accounts processed if no `account_id` is specified.
+    """
     if not statement_date:
         statement_date = date.today().replace(day=1)
     if account_id:
@@ -365,6 +580,16 @@ def process_payments_api(
 def get_invoice_setting(
     setting_id: UUID | str | None = None, session: Session = Depends(get_session)
 ) -> list[models.InvoiceSetting]:
+    """Retrieve invoice settings, optionally filtered by setting ID.
+
+    Args:
+        setting_id (UUID | str | None): Optional setting ID for filtering settings.
+        session (Session): The database session, provided by dependency injection.
+
+    Returns:
+        list[models.InvoiceSetting]:
+        A list of invoice settings or a single setting based on `setting_id`.
+    """
     if setting_id is None:
         query = queries.get_invoice_settings_query()
         settings = session.exec(query).all()
@@ -406,6 +631,15 @@ def submit_new_invoice_setting(
 def get_tenant(
     tenant_id: UUID | None = None, session: Session = Depends(get_session)
 ) -> models.Tenant:
+    """Fetch a specific tenant by ID or all tenants if no ID is provided.
+
+    Args:
+        tenant_id (UUID | None): Unique identifier of the tenant (optional).
+        session (Session): Database session dependency.
+
+    Returns:
+        models.Tenant: A tenant instance or a list of all tenants.
+    """
     if tenant_id:
         query = queries.get_tenant_query(tenant_id)
         tenants = session.exec(query).one()
@@ -419,6 +653,14 @@ def get_tenant(
 def get_unassigned_people(
     session: Session = Depends(get_session),
 ) -> list[models.Tenant | None]:
+    """Retrieve tenants who are not assigned to any accounts.
+
+    Args:
+        session (Session): Database session dependency.
+
+    Returns:
+        list[models.Tenant | None]: List of unassigned tenants.
+    """
     query = queries.get_unassigned_people()
     tenants = session.exec(query).all()
     return tenants
@@ -428,6 +670,15 @@ def get_unassigned_people(
 def add_new_tenant(
     tenant: models.Tenant, session: Session = Depends(get_session)
 ) -> models.Tenant:
+    """Add a new tenant to the database.
+
+    Args:
+        tenant (models.Tenant): Tenant data model.
+        session (Session): Database session dependency.
+
+    Returns:
+        models.Tenant: Newly added tenant instance.
+    """
     try:
         session.add(tenant)
         session.commit()
@@ -442,6 +693,16 @@ def add_new_tenant(
 def update_tenant_account_id(
     tenant_id: UUID, account_id: UUID, session: Session = Depends(get_session)
 ) -> None:
+    """Update the account ID for a specified tenant.
+
+    Args:
+        tenant_id (UUID): Unique identifier of the tenant.
+        account_id (UUID): New account ID for the tenant.
+        session (Session): Database session dependency.
+
+    Returns:
+        dict: Confirmation of update success.
+    """
     q = queries.update_tenant_account_id_query(tenant_id=tenant_id, account_id=account_id)
     session.exec(q)
     session.commit()
@@ -454,6 +715,16 @@ def get_water_usages_for_statement_date(
     session: Session = Depends(get_session),
     json_mode: bool = False,
 ):
+    """Fetch water usage data for a given statement date.
+
+    Args:
+        statement_date (date): Date of the water usage statement.
+        session (Session): Database session dependency.
+        json_mode (bool): Whether to return results in JSON format.
+
+    Returns:
+        list: Water usage records in list format or JSON.
+    """
     query = queries.get_water_usage_query(statement_date)
     water_usages = session.exec(query).all()
     if not len(water_usages):
@@ -471,6 +742,18 @@ def get_receivables_by_charge_type(
     is_paid: bool | None = None,
     session: Session = Depends(get_session),
 ) -> list[models.AccountsReceivable]:
+    """Retrieve accounts receivable items filtered by charge type.
+
+    Args:
+        charge_type (models.ChargeTypes): Type of charge to retrieve.
+        statement_date (date | None): Date for statement.
+        processing_date (date | None): Processing date filter.
+        is_paid (bool | None): Payment status filter.
+        session (Session): Database session dependency.
+
+    Returns:
+        list[models.AccountsReceivable]: List of accounts receivable items.
+    """
     q = queries.get_receivable_by_charge_type_query(
         charge_type=charge_type,
         statement_date=statement_date,
@@ -488,6 +771,19 @@ def incur_new_charges(
     processing_date: date,
     session: Session = Depends(get_session),
 ) -> list[models.AccountsReceivable | None]:
+    """Incur new charges based on charge type and accounts.
+
+    Args:
+        charge_type (models.ChargeTypes): Type of charge to incur.
+        accounts (list[models.Account]): List of accounts to charge.
+        setting (models.InvoiceSetting): Invoice setting configuration.
+        statement_date (date): Statement date for the charges.
+        processing_date (date): Date charges are processed.
+        session (Session): Database session dependency.
+
+    Returns:
+        list[models.AccountsReceivable | None]: List of incurred charges.
+    """
     if (
         charge_type == models.ChargeTypes.RENT
         or charge_type == models.ChargeTypes.STORAGE
@@ -586,6 +882,19 @@ def _get_receivables_or_incur_new_charges(
     processing_date: date,
     session: Session = Depends(get_session),
 ) -> list[models.AccountsReceivable]:
+    """Retrieve existing or incur new charges based on charge type and account.
+
+    Args:
+        charge_type (models.ChargeTypes): Type of charge to retrieve or incur.
+        accounts (list[models.Account]): List of accounts to check.
+        setting (models.InvoiceSetting): Invoice setting configuration.
+        statement_date (date): Statement date for charges.
+        processing_date (date): Date charges are processed.
+        session (Session): Database session dependency.
+
+    Returns:
+        list[models.AccountsReceivable]: List of accounts receivable items.
+    """
     charges = get_receivables_by_charge_type(
         charge_type=charge_type,
         statement_date=statement_date,
@@ -612,6 +921,18 @@ def get_receivables_or_incur_new_charges(
     processing_date: date,
     session: Session = Depends(get_session),
 ) -> dict:
+    """Retrieve or incur charges for multiple charge types for given accounts.
+
+    Args:
+        accounts (list[models.Account]): Accounts to retrieve or incur charges for.
+        setting (models.InvoiceSetting): Invoice setting configuration.
+        statement_date (date): Statement date for charges.
+        processing_date (date): Date charges are processed.
+        session (Session): Database session dependency.
+
+    Returns:
+        dict: Dictionary of accounts receivable items by charge type.
+    """
     ars = {}
     for i in models.ChargeTypes:
         ars[i] = _get_receivables_or_incur_new_charges(
@@ -633,6 +954,18 @@ def get_monthly_charges(
     session: Session = Depends(get_session),
     write_mode: bool = False,
 ) -> dict:
+    """Fetch monthly charges based on invoice settings and statement date.
+
+    Args:
+        invoice_setting_id (UUID | str): ID of the invoice setting.
+        statement_date (date): Statement date for charges.
+        processing_date (date | None): Date charges are processed.
+        session (Session): Database session dependency.
+        write_mode (bool): Mode to write charges if True.
+
+    Returns:
+        dict: Dictionary of monthly charges grouped by account.
+    """
     if not processing_date:
         processing_date = models.et_date_now()
 
@@ -684,6 +1017,17 @@ def add_monthly_charges(
     processing_date: date | None = None,
     session: Session = Depends(get_session),
 ) -> int:
+    """Add monthly charges to the accounts receivable database.
+
+    Args:
+        invoice_setting_id (UUID | str): ID of the invoice setting.
+        statement_date (date): Statement date for charges.
+        processing_date (date | None): Date charges are processed.
+        session (Session): Database session dependency.
+
+    Returns:
+        int: Number of new charges added.
+    """
     if not processing_date:
         processing_date = models.et_date_now()
 
@@ -715,6 +1059,16 @@ def get_existing_invoices(
     invoice_setting_id: UUID | None = Query(None),
     session: Session = Depends(get_session),
 ) -> list:
+    """Retrieve existing invoices for a specific statement date.
+
+    Args:
+        statement_date (date): Statement date for invoices.
+        invoice_setting_id (UUID | None): ID of the invoice setting (optional).
+        session (Session): Database session dependency.
+
+    Returns:
+        list: List of invoices.
+    """
     q = queries.get_existing_invoice_query(
         statement_date=statement_date, setting_id=invoice_setting_id
     )
@@ -730,6 +1084,17 @@ def get_invoice_inputs_data(
     update_db: bool = False,
     session: Session = Depends(get_session),
 ) -> list[dict | None]:
+    """Get input data for invoice generation, with optional DB update.
+
+    Args:
+        statement_date (date): Statement date for the invoice.
+        invoice_setting_id (str | None): ID of the invoice setting (optional).
+        update_db (bool): Whether to update the DB with input data.
+        session (Session): Database session dependency.
+
+    Returns:
+        list[dict | None]: List of invoice input data.
+    """
     existing_invoices = get_existing_invoices(
         statement_date=statement_date,
         invoice_setting_id=invoice_setting_id,
@@ -766,6 +1131,14 @@ def get_invoice_inputs_data(
 
 @app.get("/lots/available")
 def get_available_lots(session: Session = Depends(get_session)):
+    """Retrieve a list of available lots.
+
+    Args:
+        session (Session): Database session dependency.
+
+    Returns:
+        list: Available lots.
+    """
     q = queries.get_available_lots_query()
     available_lots = session.exec(q).all()
     return available_lots
