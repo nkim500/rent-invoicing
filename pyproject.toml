@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 90
+select = [
+    "E", "W", "F", "I", "B", "C4", "UP"
+]
+show-fixes = true
+lint.ignore = ["E203", "E266", "W605", "F403", "F401", "E402", "UP007", "B008"]
+
+[tool.ruff.lint.isort]
+force-single-line = true

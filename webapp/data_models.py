@@ -4,29 +4,32 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID
 from uuid import uuid4
+
+from pydantic import BaseModel
+from pydantic import Field
+from pydantic import field_serializer
+from pydantic import field_validator
+from pydantic import model_validator
+from pydantic_settings import SettingsConfigDict
 from pytz import timezone
 
-from pydantic import BaseModel, field_serializer, field_validator, model_validator
-from pydantic import Field
-from pydantic_settings import SettingsConfigDict
 
 def et_datetime_now():
-    eastern = timezone('US/Eastern')
+    eastern = timezone("US/Eastern")
     return datetime.now(tz=eastern)
 
 
 def et_date_now():
-    eastern = timezone('US/Eastern')
+    eastern = timezone("US/Eastern")
     return datetime.now(tz=eastern).date()
 
 
 def et_date_due():
-    eastern = timezone('US/Eastern')
+    eastern = timezone("US/Eastern")
     return datetime.now(tz=eastern).date().replace(day=1)
 
 
 class WaterUsage(BaseModel):
-
     id: UUID = Field(default_factory=uuid4)
     watermeter_id: int = Field(nullable=False)
     previous_date: date = Field(default_factory=et_date_now)
@@ -36,23 +39,21 @@ class WaterUsage(BaseModel):
     statement_date: date = Field(default_factory=et_date_due)
     inserted_at: datetime = Field(default_factory=et_datetime_now)
 
-    @field_serializer('id')
+    @field_serializer("id")
     def serialize_uuid(self, v: UUID, _info):
         return str(v)
 
-    @field_serializer('previous_date', 'current_date', 'statement_date', 'inserted_at')
+    @field_serializer("previous_date", "current_date", "statement_date", "inserted_at")
     def serialize_date(self, v: date | datetime, _info):
         if isinstance(v, str):
             return v
         else:
             return v.isoformat()
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def check_water(self):
         if self.current_reading < self.previous_reading:
-            raise ValueError(
-                'Current reading cannot be less than previous reading'
-            )
+            raise ValueError("Current reading cannot be less than previous reading")
         return self
 
     @property
@@ -64,7 +65,6 @@ class WaterUsage(BaseModel):
 
 
 class Tenant(BaseModel):
-
     id: UUID = Field(default_factory=uuid4)
     first_name: str = Field(nullable=False)
     last_name: str = Field(nullable=False)
@@ -75,18 +75,18 @@ class Tenant(BaseModel):
 
     @property
     def full_name(self):
-        return f'{self.first_name} {self.last_name}'
-    
-    @field_serializer('id', 'account_id')
+        return f"{self.first_name} {self.last_name}"
+
+    @field_serializer("id", "account_id")
     def serialize_uuid(self, v: UUID, _info):
         if v is not None:
             return str(v)
         else:
             return v
 
-    @field_serializer('inserted_at')
+    @field_serializer("inserted_at")
     def serialize_date(self, v: date | datetime, _info):
-        return v.isoformat()    
+        return v.isoformat()
 
 
 class Payment(BaseModel):
@@ -101,21 +101,21 @@ class Payment(BaseModel):
 
     model_config = SettingsConfigDict(arbitrary_types_allowed=True)
 
-    @field_serializer('id', 'beneficiary_account_id')
+    @field_serializer("id", "beneficiary_account_id")
     def serialize_uuid(self, v: UUID, _info):
         return str(v)
 
-    @field_serializer('payment_dated', 'payment_received', 'inserted_at')
+    @field_serializer("payment_dated", "payment_received", "inserted_at")
     def serialize_date(self, v: date | datetime, _info):
         return v.isoformat()
 
 
 class ChargeTypes(str, Enum):
-    LATEFEE = 'LATEFEE'
-    WATER = 'WATER'
-    STORAGE = 'STORAGE'
-    RENT = 'RENT'
-    OTHER = 'OTHER'
+    LATEFEE = "LATEFEE"
+    WATER = "WATER"
+    STORAGE = "STORAGE"
+    RENT = "RENT"
+    OTHER = "OTHER"
 
 
 class InvoiceSetting(BaseModel):
@@ -131,11 +131,11 @@ class InvoiceSetting(BaseModel):
 
     model_config = SettingsConfigDict(arbitrary_types_allowed=True)
 
-    @field_serializer('id')
+    @field_serializer("id")
     def serialize_uuid(self, v: UUID, _info):
         return str(v)
 
-    @field_serializer('effective_as_of', 'inserted_at')
+    @field_serializer("effective_as_of", "inserted_at")
     def serialize_date(self, v: date, _info):
         if isinstance(v, date):
             return v.isoformat()
@@ -143,19 +143,14 @@ class InvoiceSetting(BaseModel):
             return v
 
     @field_validator(
-        "rent_monthly_rate",
-        "storage_monthly_rate",
-        mode="before",
-        check_fields=False
+        "rent_monthly_rate", "storage_monthly_rate", mode="before", check_fields=False
     )
     def coerce_and_round_up(cls, v):
         if isinstance(v, float):
             return round(v, 0)
         return v
 
-    def increase_rates_by_percentage(
-        self, percentage: float = 3.0
-    ) -> "InvoiceSetting":
+    def increase_rates_by_percentage(self, percentage: float = 3.0) -> "InvoiceSetting":
         increase_factor = 1 + (percentage / 100)
         return InvoiceSetting(
             rent_monthly_rate=self.rent_monthly_rate * increase_factor,
@@ -171,14 +166,12 @@ class InvoiceSetting(BaseModel):
             if hasattr(self, key):
                 setattr(self, key, value)
             else:
-                raise AttributeError(
-                    f"{key} is not a valid attribute of InvoiceSetting."
-                )
+                raise AttributeError(f"{key} is not a valid attribute of InvoiceSetting.")
 
 
 class AccountsReceivable(BaseModel):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    account_id: UUID = Field(foreign_key='accounts.id', index=True)
+    account_id: UUID = Field(foreign_key="accounts.id", index=True)
     amount_due: float = Field(default=0)
     statement_date: date = Field(default_factory=et_date_now)
     charge_type: ChargeTypes = Field(default=ChargeTypes.RENT)
@@ -187,16 +180,16 @@ class AccountsReceivable(BaseModel):
     inserted_at: datetime = Field(default_factory=et_datetime_now)
 
     model_config = SettingsConfigDict(arbitrary_types_allowed=True)
-    
-    @field_serializer('id', 'account_id')
+
+    @field_serializer("id", "account_id")
     def serialize_uuid(self, v: UUID, _info):
         return str(v)
 
-    @field_serializer('statement_date', 'inserted_at')
+    @field_serializer("statement_date", "inserted_at")
     def serialize_date(self, v: date | datetime, _info):
         return v.isoformat()
 
-    @field_serializer('charge_type')
+    @field_serializer("charge_type")
     def serialize_enum(self, charge_type: ChargeTypes, _info):
         return charge_type.value
 
@@ -204,8 +197,8 @@ class AccountsReceivable(BaseModel):
 class Property(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     property_code: str = Field(default="")
-    street_address: str = Field(default='')
-    city_state_zip: str = Field(default='')
+    street_address: str = Field(default="")
+    city_state_zip: str = Field(default="")
     inserted_at: datetime = Field(default_factory=et_datetime_now)
 
     model_config = SettingsConfigDict(arbitrary_types_allowed=True)
@@ -269,15 +262,15 @@ class InvoiceFileParse(BaseModel):
 
 
 class BillPreference(str, Enum):
-    NO_PAPER = 'NO_PAPER'
-    NO_EMAIL = 'NO_EMAIL'
-    NO_PREFENCE = 'NO_PREFENCE'
+    NO_PAPER = "NO_PAPER"
+    NO_EMAIL = "NO_EMAIL"
+    NO_PREFENCE = "NO_PREFENCE"
 
 
 class Account(BaseModel):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    lot_id: Optional[str] = Field(foreign_key='lots.id')
-    account_holder: Optional[UUID] = Field(default=None, foreign_key='tenants.id')
+    lot_id: Optional[str] = Field(foreign_key="lots.id")
+    account_holder: Optional[UUID] = Field(default=None, foreign_key="tenants.id")
     bill_preference: BillPreference = Field(default=BillPreference.NO_PREFENCE)
     rental_rate_override: Optional[float] = Field(default=None, nullable=True)
     storage_count: float = Field(default=0)
@@ -287,14 +280,14 @@ class Account(BaseModel):
 
     model_config = SettingsConfigDict(arbitrary_types_allowed=True)
 
-    @field_serializer('id', 'account_holder')
+    @field_serializer("id", "account_holder")
     def serialize_uuid(self, v: UUID, _info):
         if v:
             return str(v)
         else:
             return v
 
-    @field_serializer('updated_on', 'inserted_at', 'deleted_on')
+    @field_serializer("updated_on", "inserted_at", "deleted_on")
     def serialize_date(self, v: date | datetime, _info):
         if v is None:
             return v
@@ -303,6 +296,6 @@ class Account(BaseModel):
         else:
             return v.isoformat()
 
-    @field_serializer('bill_preference')
+    @field_serializer("bill_preference")
     def serialize_enum(self, bill_preference: BillPreference, _info):
         return bill_preference.value

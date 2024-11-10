@@ -1,13 +1,11 @@
 import json
 
-import streamlit as st
-from pydantic import ValidationError
-
-import data_models as models
-from config import AppConfig
 import api
+import data_models as models
+import streamlit as st
 import utils
-
+from config import AppConfig
+from pydantic import ValidationError
 
 app_config = AppConfig()
 host = app_config.host
@@ -17,7 +15,7 @@ port = app_config.port
 
 # pages
 # 1. manage changes to lot-tenant mapping
-# 3. delete account, add new tenant, link new tenant to an account, 
+# 3. delete account, add new tenant, link new tenant to an account,
 # 4. some kind of undo function
 
 # current status page - filter by, property, lot (or account)
@@ -25,8 +23,7 @@ port = app_config.port
 # apply payments, ingest_water_usage_page needs some instructions
 
 
-def current_payments_status_page():
-    ...
+def current_payments_status_page(): ...
 
 
 def manage_payments_page():
@@ -64,7 +61,7 @@ def manage_payments_page():
         st.session_state.filter_pmts_by_since_date = st.checkbox(
             "Filter payments by date:", value=False
         )
-        if st.session_state.filter_pmts_by_since_date: 
+        if st.session_state.filter_pmts_by_since_date:
             date_filter = st.date_input(
                 "See payments recorded since:", value=models.et_date_now()
             )
@@ -75,7 +72,7 @@ def manage_payments_page():
             st.button("Show less payments", key="show_less_pmts")
             and st.session_state.rows_to_show
         ):
-            st.session_state.rows_to_show = max(st.session_state.rows_to_show-3, 0)
+            st.session_state.rows_to_show = max(st.session_state.rows_to_show - 3, 0)
 
     if st.session_state.rows_to_show and st.session_state.see_recent_pmts:
         if not st.session_state.recent_pmts:
@@ -86,12 +83,10 @@ def manage_payments_page():
             st.write("Recently uploaded payments:")
             st.session_state.pmts_df = utils.preview_payments_dataframe(
                 payments=st.session_state.recent_pmts,
-                acccounts_with_tenant_info=st.session_state.accounts
+                acccounts_with_tenant_info=st.session_state.accounts,
             )
             st.dataframe(
-                st.session_state.pmts_df.head(
-                    st.session_state.rows_to_show
-                ).iloc[:,1:]
+                st.session_state.pmts_df.head(st.session_state.rows_to_show).iloc[:, 1:]
             )
 
             st.session_state.delete_pmt_trigger = st.checkbox(
@@ -99,22 +94,18 @@ def manage_payments_page():
             )
             if st.session_state.delete_pmt_trigger:
                 st.session_state.del_pmt_idx = st.multiselect(
-                    'Select the index of the payment(s) to delete:',
-                    st.session_state.pmts_df.head(st.session_state.rows_to_show).index
+                    "Select the index of the payment(s) to delete:",
+                    st.session_state.pmts_df.head(st.session_state.rows_to_show).index,
                 )
                 st.write("Payments to be deleted:")
-                selected_rows = st.session_state.pmts_df.loc[
-                    st.session_state.del_pmt_idx
-                ]
-                st.dataframe(selected_rows.iloc[:,1:])
+                selected_rows = st.session_state.pmts_df.loc[st.session_state.del_pmt_idx]
+                st.dataframe(selected_rows.iloc[:, 1:])
 
                 st.session_state.delete_confirm = st.button("Click to finalize delete")
                 if st.session_state.delete_confirm and st.session_state.del_pmt_idx:
                     delete_cnt = 0
                     for i in st.session_state.del_pmt_idx:
-                        resp = api.delete_payment(
-                            st.session_state.pmts_df.loc[i].id
-                        )
+                        resp = api.delete_payment(st.session_state.pmts_df.loc[i].id)
                         delete_cnt += 1 if resp.status_code == 204 else 0
                     if delete_cnt:
                         st.write(f"Successfully deleted {delete_cnt} payments")
@@ -124,14 +115,13 @@ def manage_payments_page():
                     st.session_state.see_recent_pmts = False
                     st.session_state.filter_pmts_by_since_date = False
 
-
     #
     st.subheader("Record New Payments:")
     if st.checkbox("Select to record new payments"):
         if st.button("Add more input field"):
             st.session_state.input_count += 1
         if st.button("Remove input field"):
-            st.session_state.input_count = max(st.session_state.input_count-1, 0)
+            st.session_state.input_count = max(st.session_state.input_count - 1, 0)
 
         with st.form("form_payment_submit", clear_on_submit=True):
             inputs = []
@@ -143,16 +133,12 @@ def manage_payments_page():
                     "Select the lot for which this payment is applied",
                     st.session_state.accounts,
                     format_func=lambda x: f"lot_id: {x['lot_id']} - {x['full_name']}",
-                    key=f"acct_{i}"
+                    key=f"acct_{i}",
                 )
                 with col1:
                     st.write("Payer info:")
-                    payer_first_name = st.text_input(
-                        "First name", key=f"f_name_{i}"
-                    )
-                    payer_last_name = st.text_input(
-                        "Last name", key=f"l_name_{i}"
-                    )
+                    payer_first_name = st.text_input("First name", key=f"f_name_{i}")
+                    payer_last_name = st.text_input("Last name", key=f"l_name_{i}")
                 with col2:
                     st.write("Payment dates:")
                     payment_date = st.date_input(
@@ -180,7 +166,7 @@ def manage_payments_page():
                         amount=i[0],
                         payment_dated=i[1],
                         payment_received=i[2],
-                        payer=i[3]
+                        payer=i[3],
                     )
                     uploadables.append(payment)
                 else:
@@ -208,7 +194,7 @@ def manage_payments_page():
                         success_counter += 1
                     else:
                         fail_counter += 1
-            
+
             st.session_state.allow_submission = False
             st.session_state.input_count = 0
 
@@ -217,10 +203,8 @@ def manage_payments_page():
             if fail_counter:
                 st.error(f"Could not upload {fail_counter} payment(s)")
             if no_amt_count:
-                st.error(
-                    f"Did not upload {no_amt_count} payment(s) with value 0 or less"
-                )
-    
+                st.error(f"Did not upload {no_amt_count} payment(s) with value 0 or less")
+
     #
     st.subheader("Process Payments")
     if st.button("Apply available payments to outstanding receivables"):
@@ -287,9 +271,7 @@ def manage_receivables_page():
                 st.session_state.uploaded_file
             )
         except AssertionError:
-            st.error(
-                "Please make sure the date columns are in 'YYYY-MM-DD' format"
-            )
+            st.error("Please make sure the date columns are in 'YYYY-MM-DD' format")
             st.stop()
         st.write("Preview of the uploaded file:")
         st.dataframe(st.session_state.water_df)
@@ -335,9 +317,9 @@ def manage_receivables_page():
             st.error("No water usages for this statement date to create new charges")
 
         receivables = api.get_monthly_charges(
-            invoice_setting_id=invoice_setting['id'],
+            invoice_setting_id=invoice_setting["id"],
             statement_date=statement_date,
-            processing_date=st.session_state.processing_date
+            processing_date=st.session_state.processing_date,
         )
         accounts = api.get_accounts_and_holder()
         if st.session_state.processing_date:
@@ -351,11 +333,13 @@ def manage_receivables_page():
             accounts=accounts,
             payments=payments,
         )
-        st.write("Rent, storage, water, and late fees will be recorded, if shown below:")  # to be changed to higlighted
+        st.write(
+            "Rent, storage, water, and late fees will be recorded, if shown below:"
+        )  # to be changed to higlighted
         st.dataframe(
             st.session_state.receivable_df,
             hide_index=True,
-            height=35*len(st.session_state.receivable_df)+38,
+            height=35 * len(st.session_state.receivable_df) + 38,
         )
 
     if st.button("Record new recurring charges"):
@@ -367,9 +351,9 @@ def manage_receivables_page():
             if st.button("Submit"):
                 st.write("Submitting new charges to the database...")
                 api_response = api.post_monthly_charges(
-                    invoice_setting_id=invoice_setting['id'],
+                    invoice_setting_id=invoice_setting["id"],
                     statement_date=statement_date,
-                    processing_date=st.session_state.processing_date
+                    processing_date=st.session_state.processing_date,
                 )
                 if api_response.status_code == 200:
                     cnt = json.loads(api_response.content)
@@ -377,8 +361,7 @@ def manage_receivables_page():
                 else:
                     st.error("New charges could not be recorded in the database")
                     st.json(api_response.content)
-                st.session_state.show_submission_confirm_check = False    
-
+                st.session_state.show_submission_confirm_check = False
 
     # Other rent upload
     st.subheader("Create and upload one-off receivables")
@@ -387,20 +370,22 @@ def manage_receivables_page():
         st.session_state.input_count_ += 1
     if st.button("Remove receivable"):
         st.session_state.input_count_ -= 1
-    
+
     if st.session_state.input_count_ > 0:
         with st.form("one_off_charge_form"):
             inputs = []
             for i in range(st.session_state.input_count_):
                 st.write(f"**New one-off charge #{i+1}**")
                 amount_due = st.number_input(
-                    "Amount to charge", min_value=0.0, key=f"due_{i}",
+                    "Amount to charge",
+                    min_value=0.0,
+                    key=f"due_{i}",
                 )
                 p_account = st.selectbox(
                     "Select the lot for which this payment is applied",
                     st.session_state.accounts,
                     format_func=lambda x: f"lot_id: {x['lot_id']} - {x['full_name']}",
-                    key=f"p_acct_{i}"
+                    key=f"p_acct_{i}",
                 )
                 rec_detail = st.text_input(
                     "Add brief note about the charge to be created", key=f"r_deet_{i}"
@@ -408,16 +393,12 @@ def manage_receivables_page():
                 statement_date = st.date_input(
                     label="Which statement date is this charge for?",
                     value=st.session_state.statement_date,
-                    key=f"one_off_{i}"
+                    key=f"one_off_{i}",
                 )
                 paid = st.selectbox(
-                    label="Is it paid?",
-                    options=[False, True],
-                    key=f"is_paid_{i}"
+                    label="Is it paid?", options=[False, True], key=f"is_paid_{i}"
                 )
-                inputs.append(
-                    [amount_due, rec_detail, paid, p_account]
-                )
+                inputs.append([amount_due, rec_detail, paid, p_account])
             st.session_state.submitted = st.form_submit_button("Submit")
 
     if st.session_state.submitted and inputs:
@@ -433,7 +414,7 @@ def manage_receivables_page():
                     amount_due=i[0],
                     paid=i[2],
                     charge_type=models.ChargeTypes.OTHER,
-                    details={"note": i[1]}
+                    details={"note": i[1]},
                 )
                 uploadables.append(receivable)
             else:
@@ -463,7 +444,7 @@ def manage_receivables_page():
                     success_counter += 1
                 else:
                     fail_counter += 1
-        
+
         if success_counter:
             st.success(f"Successfully uploaded {success_counter} receivable(s)")
         if fail_counter:
@@ -475,7 +456,6 @@ def manage_receivables_page():
 
         st.session_state.allow_submission = False
         st.session_state.submitted = False
-        
 
 
 def generate_invoices_page():
@@ -490,16 +470,16 @@ def generate_invoices_page():
             st.session_state.download_triggered = False
         if "upload_invoice_to_db" not in st.session_state:
             st.session_state.upload_invoice_to_db = True
-        
+
     _initialize_state()
     statement_date = st.session_state.statement_date
     template_path = app_config.template_path
     export_path = app_config.output_path
     invoice_setting = st.session_state.invoice_setting
-    
+
     st.subheader(f"Status check for {statement_date.strftime("%B %Y")} statement")
     i_check = api.get_invoices_for_statement_date(statement_date)
-    if i_check: 
+    if i_check:
         st.info("Invoice for this statement date already in DB")
 
     w_check = api.get_water_usages_for_statement_date(statement_date)
@@ -507,7 +487,7 @@ def generate_invoices_page():
         st.success("Water readings in DB")
     else:
         st.error("Water readings not found in DB")
-    
+
     s_check = api.get_storages_for_statement_date(statement_date)
     if s_check:
         st.success("Storages in DB")
@@ -525,7 +505,6 @@ def generate_invoices_page():
         st.info(f"{len(o_check)} other rents found in DB for this statement date")
     else:
         st.info("No other rents found in DB for this statement date")
-    
 
     st.subheader("Generate invoice")
 
@@ -537,16 +516,14 @@ def generate_invoices_page():
         try:
             raw = api.get_invoice_data(
                 statement_date=statement_date,
-                setting_id=invoice_setting['id'],
-                update_db=st.session_state.upload_invoice_to_db
+                setting_id=invoice_setting["id"],
+                update_db=st.session_state.upload_invoice_to_db,
             )
         except json.JSONDecodeError:
             st.error("Check if the receivables for the statement date is in the DB")
             return
 
-        st.session_state.invoice_data = [
-            models.InvoiceFileParse(**i) for i in raw if i
-        ]
+        st.session_state.invoice_data = [models.InvoiceFileParse(**i) for i in raw if i]
         file_paths = utils.generate_invoices(
             template_path=template_path,
             input_data=st.session_state.invoice_data,
@@ -593,7 +570,7 @@ def accounts_management_page():
                 label="Enter monthly rental rate",
                 value=st.session_state.invoice_setting["rent_monthly_rate"],
                 help="Enter dollar amount, per month",
-                min_value=0
+                min_value=0,
             )
             water_monthly_rate = st.number_input(
                 label="Enter monthly water bill rate per gallon",
@@ -602,25 +579,25 @@ def accounts_management_page():
                 min_value=0.0,
                 max_value=0.9,
                 step=1e-6,
-                format="%.6f"
+                format="%.6f",
             )
             water_service_fee = st.number_input(
                 label="Enter monthly water bill service fee",
                 value=st.session_state.invoice_setting["water_service_fee"],
                 help="Enter dollar amount per month.",
-                min_value=0.0
+                min_value=0.0,
             )
             storage_monthly_rate = st.number_input(
                 label="Enter monthly storage rate",
                 value=st.session_state.invoice_setting["storage_monthly_rate"],
                 help="Enter dollar amount per month.",
-                min_value=0
+                min_value=0,
             )
             late_fee_rate = st.number_input(
                 label="Enter late fee percentage rate (in decimals)",
                 value=st.session_state.invoice_setting["late_fee_rate"],
                 help="E.g. Enter 0.05, if the late fee is 5%.",
-                min_value=0.0
+                min_value=0.0,
             )
             overdue_cutoff_days = st.number_input(
                 label="Enter number of days for grace period until invoice is \
@@ -628,7 +605,7 @@ def accounts_management_page():
                 value=st.session_state.invoice_setting["overdue_cutoff_days"],
                 help="E.g. Enter 10, if the 10th of each month is the last day \
                     of the grace period.",
-                min_value=0
+                min_value=0,
             )
             effective_as_of = st.date_input(
                 label="Enter the first statement date this setting becomes \
@@ -648,7 +625,7 @@ def accounts_management_page():
                         "storage_monthly_rate": storage_monthly_rate,
                         "late_fee_rate": late_fee_rate,
                         "overdue_cutoff_days": overdue_cutoff_days,
-                        "effective_as_of": effective_as_of
+                        "effective_as_of": effective_as_of,
                     }
                 )
                 new_setting_response = api.submit_new_invoice_setting(new_setting)
@@ -664,7 +641,6 @@ def accounts_management_page():
                 )
 
             st.session_state.add_setting = False
-
 
     #
     st.subheader("Open a new account")
@@ -688,7 +664,7 @@ def accounts_management_page():
                     If you would like to assign a lot to a new account, use the\
                     database management tool to remove a lot from another account\
                     or delete an active account.
-                """
+                """,
             )
             account_holder = st.selectbox(
                 label="Select a person to assign to this account",
@@ -697,27 +673,27 @@ def accounts_management_page():
                 help="""
                     If the person for this account is not listed, add the person\
                     by using the 'Add a new tenant' section.
-                """
+                """,
             )
             bill_preference = st.selectbox(
                 label="Select the billing preference for this account",
                 options=[preference.value for preference in models.BillPreference],
-                index=[
-                    preference for preference in models.BillPreference
-                ].index(models.BillPreference.NO_PREFENCE)
+                index=list(models.BillPreference).index(
+                    models.BillPreference.NO_PREFENCE
+                ),
             )
             rental_rate_override = st.number_input(
                 label="Enter monthly rent ONLY IF DIFFERENT from others'",
                 value=None,
-                min_value=0
+                min_value=0,
             )
             storage_count = st.number_input(
                 label="Enter number of storage(s) assigned to this account",
                 value=0,
-                min_value=0
+                min_value=0,
             )
             submit_account = st.form_submit_button("Submit account")
-        
+
         if submit_account:
             try:
                 if lot_id:
@@ -730,7 +706,7 @@ def accounts_management_page():
                         "account_holder": account_holder["id"],
                         "bill_preference": bill_preference,
                         "rental_rate_override": rental_rate_override,
-                        "storage_count": storage_count
+                        "storage_count": storage_count,
                     }
                 )
                 new_acct_resp = api.add_new_account(new_account)
@@ -747,7 +723,6 @@ def accounts_management_page():
 
             st.session_state.add_account = False
 
-
     #
     st.subheader("Manage an account's details")
     st.session_state.manage_account = st.checkbox(
@@ -760,9 +735,10 @@ def accounts_management_page():
             options=st.session_state.accounts_in_db,
             format_func=lambda x: (
                 f"lot_id: {x['lot_id'] if x['lot_id'] else 'n/a'} - {x['full_name']}"
-                if x is not None else None
+                if x is not None
+                else None
             ),
-            index=None
+            index=None,
         )
 
         st.session_state.del_acct_trigger = st.checkbox(
@@ -776,16 +752,14 @@ def accounts_management_page():
                     st.success("The account is now deleted")
                 else:
                     st.error("Failed to delete account")
-        
+
         # st.checkbox("Assign lot to an account")
         # st.checkbox("Assign tenant to an account")
         # st.checkbox("Remove tenant from an account")
 
     #
     st.subheader("Add a new tenant")
-    st.session_state.add_tenant = st.checkbox(
-        "Select to add a new tenant", value=False
-    )
+    st.session_state.add_tenant = st.checkbox("Select to add a new tenant", value=False)
 
     if st.session_state.add_tenant:
         st.session_state.tenant_submitted = False
@@ -795,12 +769,13 @@ def accounts_management_page():
             last_name = st.text_input(label="Enter the tenant's last name")
             acct_assignment = st.selectbox(
                 label="Assign tenant to an account?",
-                options=[None]+st.session_state.accounts_in_db,
+                options=[None] + st.session_state.accounts_in_db,
                 format_func=lambda x: (
                     f"lot_id: {x['lot_id'] if x['lot_id'] else 'n/a'}-{x['full_name']}"
-                    if x is not None else None
+                    if x is not None
+                    else None
                 ),
-                index=0
+                index=0,
             )
             st.session_state.tenant_submitted = st.form_submit_button("Add this tenant")
 
@@ -810,7 +785,7 @@ def accounts_management_page():
                 {
                     "first_name": first_name,
                     "last_name": last_name,
-                    "account_id": acct_assignment["id"] if acct_assignment else None
+                    "account_id": acct_assignment["id"] if acct_assignment else None,
                 }
             )
             new_tenant_response = api.submit_new_tenant(new_tenant)
@@ -824,5 +799,5 @@ def accounts_management_page():
 
         except ValidationError:
             st.error("Tenant could not be constructed properly. Please check values.")
-        
+
         st.session_state.add_tenant = False
