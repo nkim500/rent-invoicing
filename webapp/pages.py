@@ -11,17 +11,6 @@ app_config = AppConfig()
 host = app_config.host
 port = app_config.port
 
-# model
-
-# pages
-# 1. manage changes to lot-tenant mapping
-# 3. delete account, add new tenant, link new tenant to an account,
-# 4. some kind of undo function
-
-# current status page - filter by, property, lot (or account)
-#  - how much is still outstanding as of today, how much was billed the latest
-# apply payments, ingest_water_usage_page needs some instructions
-
 
 def manage_payments_page():
     st.header("Manage Payments")
@@ -62,12 +51,12 @@ def manage_payments_page():
             )
             st.session_state.recent_pmts = api.get_recent_payments(since=date_filter)
         if st.button("Show more payments", key="show_more_pmts"):
-            st.session_state.rows_to_show += 3
+            st.session_state.rows_to_show += 5
         if (
             st.button("Show less payments", key="show_less_pmts")
             and st.session_state.rows_to_show
         ):
-            st.session_state.rows_to_show = max(st.session_state.rows_to_show - 3, 0)
+            st.session_state.rows_to_show = max(st.session_state.rows_to_show - 5, 0)
 
     if st.session_state.rows_to_show and st.session_state.see_recent_pmts:
         if not st.session_state.recent_pmts:
@@ -465,6 +454,8 @@ def generate_invoices_page():
             st.session_state.download_triggered = False
         if "upload_invoice_to_db" not in st.session_state:
             st.session_state.upload_invoice_to_db = True
+        if "view_invoices_in_database" not in st.session_state:
+            st.session_state.view_invoices_in_database = False
 
     _initialize_state()
     statement_date = st.session_state.statement_date
@@ -526,6 +517,23 @@ def generate_invoices_page():
         )
         st.write(f"Generated {len(file_paths)} invoice(s)")
         utils.user_download_invoice_zip(export_path)
+
+    st.subheader("View Invoices in Database")
+    st.session_state.view_invoices_in_database = st.checkbox("View invoices")
+    if st.session_state.view_invoices_in_database:
+        try:
+            raw = api.get_existing_invoice_data(statement_date=statement_date)
+            df = utils.display_existing_invoice(raw)
+            st.write(f"Showing invoices for the statement date of {statement_date}")
+            st.dataframe(df)
+            st.info(
+                """
+                    If you would like to see invoices for a different statement date,\
+                    change the statement date from sidebar
+                """
+            )
+        except json.JSONDecodeError:
+            st.error("There are no invoices for the selected statement date")
 
 
 def accounts_management_page():
