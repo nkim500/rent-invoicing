@@ -79,7 +79,7 @@ def incur_recurring_charges(
             charge_type=charge_type,
         )
         for i in input_list
-        if _calculate_amount_due(i, charge_type) != 0
+        if input_list and _calculate_amount_due(i, charge_type) != 0
     ]
 
     return inserts
@@ -203,15 +203,40 @@ def process_accounts_receivables(
 
         # If receivable was partially covered, create a new one for the remaining amount
         if receivable.amount_due > 0 and tried_processing:
-            new_receivable = models.AccountsReceivable(
-                account_id=receivable.account_id,
-                amount_due=round(receivable.amount_due, 2),
-                statement_date=receivable.statement_date,
-                charge_type=receivable.charge_type,
-                paid=False,
-                details={"residual carried over from": str(receivable.id)},
-                inserted_at=receivable.inserted_at,
-            )
+            if (
+                receivable.details
+                and "note" in receivable.details.keys()
+                and "seed" in receivable.details["note"]
+            ):
+                new_receivable = models.AccountsReceivable(
+                    account_id=receivable.account_id,
+                    amount_due=round(receivable.amount_due, 2),
+                    statement_date=receivable.statement_date,
+                    charge_type=receivable.charge_type,
+                    paid=False,
+                    details={"note": f"carry over of seed overdue {str(receivable.id)}"},
+                    inserted_at=receivable.inserted_at,
+                )
+                offset = models.AccountsReceivable(
+                    account_id=receivable.account_id,
+                    amount_due=0,
+                    statement_date=receivable.statement_date,
+                    charge_type=models.ChargeTypes.LATEFEE,
+                    paid=False,
+                    details={"original_item_id": str(new_receivable.id)},
+                )
+                residual.append(offset)
+
+            else:
+                new_receivable = models.AccountsReceivable(
+                    account_id=receivable.account_id,
+                    amount_due=round(receivable.amount_due, 2),
+                    statement_date=receivable.statement_date,
+                    charge_type=receivable.charge_type,
+                    paid=False,
+                    details={"residual carried over from": str(receivable.id)},
+                    inserted_at=receivable.inserted_at,
+                )
             residual.append(new_receivable)
             receivable.amount_due = original_amounts[receivable.id]
             receivable.paid = True

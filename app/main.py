@@ -482,8 +482,8 @@ def apply_payments_for_an_account(
         )
 
         if write_mode:
-            if len(residual) == 1:
-                session.add(residual[0])
+            if len(residual) <= 2:
+                session.add_all(residual)
                 session.commit()
             if full_paid + partial_paid:
                 for i in full_paid + partial_paid:
