@@ -68,7 +68,7 @@ def add_new_account(account: models.Account) -> requests.Response:
     Returns:
         requests.Response: Server response for the created account
     """
-    response = requests.post(url=f"{host}:{port}/accounts/", json=account.model_dump())
+    response = requests.post(url=f"{host}:{port}/accounts", json=account.model_dump())
     return response
 
 
@@ -351,6 +351,27 @@ def get_invoice_data(
         params["invoice_setting_id"] = str(setting_id)
 
     response = requests.get(url=f"{host}:{port}/invoice/input_data", params=params)
+    return json.loads(response.content)
+
+
+def get_existing_invoice_data(
+    statement_date: date, setting_id: str | UUID | None = None
+) -> list[dict]:
+    """GET request to retrieve existing invoice data based on date, setting
+
+    Args:
+        statement_date (date): Date of the statement
+        setting_id (str | UUID, optional): Invoice setting ID for filtering
+
+    Returns:
+        list[dict]: Invoice data records
+    """
+    params = {"statement_date": statement_date.isoformat()}
+
+    if setting_id:
+        params["invoice_setting_id"] = str(setting_id)
+
+    response = requests.get(url=f"{host}:{port}/invoice", params=params)
     return json.loads(response.content)
 
 

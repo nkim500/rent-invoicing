@@ -459,3 +459,23 @@ def clear_directory(file_dir: str):
                 shutil.rmtree(file_path)
         except Exception as e:
             print(f"Failed to delete {file_path}. Reason: {e}")
+
+
+def display_existing_invoice(invoice_data: list[dict]) -> pd.DataFrame:
+    collection = []
+    for invoice in invoice_data:
+        details = invoice["details"]
+        collection.append(
+            {
+                "lot": invoice["lot_id"],
+                "account holder name": invoice["tenant_name"],
+                "rent": details["amt_rent"],
+                "storage": details["amt_storage"],
+                "water": details["amt_water"],
+                "other rent": details["amt_other_rent"],
+                "overdue": details["amt_overdue"],
+                "late fees": details["amt_late_fee"],
+                "total invoice due": invoice["amount_due"],
+            }
+        )
+    return round(pd.DataFrame(collection), 2)
