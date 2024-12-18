@@ -663,3 +663,12 @@ def get_unassigned_people() -> Select:
         Select: A SQLAlchemy `Select` statement for unassigned tenants
     """
     return select(models.Tenant).where(models.Tenant.account_id.is_(None))
+
+
+def get_properties_query() -> Select:
+    """Fetch all properties
+
+    Returns:
+        Select: A SQLAlchemy `Select` statement for properties
+    """
+    return select(models.Property)

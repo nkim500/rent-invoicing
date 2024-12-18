@@ -5,11 +5,15 @@ import shutil
 import zipfile
 from datetime import date
 from datetime import datetime
+from datetime import timedelta
 from io import BytesIO
+from uuid import UUID
 
 import data_models as models
+import numpy as np
 import pandas as pd
 import streamlit as st
+from config import BusinessEntityParams
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from pydantic import ValidationError
@@ -85,6 +89,24 @@ def invoice_setting_widget(invoice_settings: list[dict]) -> dict:
     )
 
     return st.session_state.invoice_setting
+
+
+def properties_widget(properties: list[dict]) -> dict:
+    """Returns a widget that allows user to set the session property to work with
+
+    Args:
+        properties (list[dict]): List of properties available in the database
+
+    Returns:
+        dict: Dict form of a property object
+    """
+    st.session_state.prop = st.sidebar.selectbox(
+        "Select the invoice configuration",
+        options=properties,
+        format_func=lambda x: x["property_code"],
+    )
+
+    return st.session_state.prop
 
 
 def extract_lot_number(lot_id: str | None) -> int | None:
@@ -370,8 +392,8 @@ def ingest_water_meter_readings(report_file: BytesIO) -> pd.DataFrame:
 
 
 def generate_water_usage_objects(
-    report: pd.DataFrame, statement_date: date | None = None
-) -> list[models.WaterUsage]:
+    report: pd.DataFrame, statement_date: date | None = None, indexed: bool = False
+) -> list[models.WaterUsage] | dict[int, models.WaterUsage]:
     """Composes a list of WaterUsage objects from a pd.DataFrame of water usage report
 
     Args:
@@ -388,12 +410,15 @@ def generate_water_usage_objects(
         statement_date = date.today().replace(day=1)
 
     water_usages = []
+    if indexed:
+        water_usages = {}
+
     check_list = []
 
     previous_date = report.columns[3]
     current_date = report.columns[2]
 
-    for _, row in report.iterrows():
+    for n, row in report.iterrows():
         try:
             water_usage = models.WaterUsage(
                 watermeter_id=row["Meter #"],
@@ -403,7 +428,10 @@ def generate_water_usage_objects(
                 previous_reading=row.iloc[3],
                 current_reading=row.iloc[2],
             )
-            water_usages.append(water_usage)
+            if indexed:
+                water_usages[n] = water_usage
+            else:
+                water_usages.append(water_usage)
         except ValidationError:
             check_list.append(row.name)
 
@@ -411,6 +439,267 @@ def generate_water_usage_objects(
         return check_list
 
     return water_usages
+
+
+def ingest_bookkeeping_excel(
+    book: BytesIO, sheet_name: str | None = None
+) -> pd.DataFrame:
+    """Ingests bookkeeping file in .xlsx format from user and returns as pd.DataFrame
+
+    Args:
+        report_file (BytesIO): uploaded bookkeeping file
+    """
+    if sheet_name:
+        df = pd.read_excel(book, header=2, index_col=0, sheet_name=sheet_name)
+    else:
+        df = pd.read_excel(book, header=2, index_col=0, sheet_name=-1)
+
+    drop_col_idx = [1, 9, 15, 23, 25]
+    out_df = df.iloc[:, [i for i in range(len(df.columns)) if i not in drop_col_idx]]
+    out_df.columns = [
+        "tenant_name",
+        "starting_balance",
+        "monthly_due_last_month",
+        "paid_on_time_last_month",
+        "paid_past_due_last_month",
+        "late_fee_accrued_last_month",
+        "total_carried_over_last_month",
+        "ending_balance",
+        "monthly_rent",
+        "monthly_storage",
+        "monthly_water",
+        "monthly_other",
+        "new_charges_this_month",
+        "payment_on_time_1",
+        "payment_on_time_2",
+        "payment_on_time_3",
+        "payment_overdue_1",
+        "payment_overdue_2",
+        "payment_overdue_3",
+        "payment_overdue_4",
+        "late_fee_this_month",
+        "carry_over_to_next_month",
+    ]
+
+    return out_df
+
+
+def serialize_invoice_input_from_book_ingest(
+    company: BusinessEntityParams,
+    statement_date: date,
+    property_code: str,
+    street_address_base: str,
+    csz_address: str,
+    entry: models.BookIngest,
+    water: models.WaterUsage,
+    invoice_setting_id: str | UUID,
+    # as_invoice_object: bool = False,
+) -> dict:
+    """
+    Parse from bookkeeping .xlsx files and convert it into a dictionary or Invoice object.
+
+    Args:
+        book_entries (list[BookIngest]):
+            List containing invoice data fields as BookIngest object.
+        as_invoice_object (bool, optional):
+            If True, returns a validated Invoice model object instead of a dictionary.
+
+    Returns:
+        dict | list[models.Invoice]:
+            Parsed row data in dictionary form or as an Invoice object.
+    """
+    statement_date = statement_date
+    total_amount_due = entry.total_amount_due_for_invoice
+    invoice_setting_id = invoice_setting_id
+
+    if not total_amount_due:
+        return
+
+    lot_id = property_code + str(entry.lot_id)
+    csz = csz_address
+    if lot_id:
+        tenant_address_1 = str(entry.lot_id) + " " + street_address_base
+    else:
+        tenant_address_1 = ""
+    if csz:
+        tenant_address_2 = csz
+    else:
+        tenant_address_2 = ""
+
+    parsed = {
+        "invoice_customer_id": f"{lot_id}",
+        "tenant_address_1": tenant_address_1,
+        "tenant_address_2": tenant_address_2,
+        "tenant_name": entry.tenant_name,
+        "amt_prev_month_paid": (
+            entry.paid_on_time_last_month + entry.paid_past_due_last_month
+        ),
+        "amt_prev_month_residual": entry.total_carried_over_last_month,
+        "invoice_total_amount_due": entry.total_amount_due_for_invoice,
+        "amt_total_amount_due": entry.total_amount_due_for_invoice,
+        "amt_overdue": max(entry.ending_balance, 0),
+        "amt_other_rent": entry.monthly_other,
+        "amt_rent": entry.monthly_rent,
+        "amt_storage": entry.monthly_storage,
+        "amt_water": entry.monthly_water,
+        "water_bill_period": entry.monthly_water,
+        "water_prev_read": water.previous_reading,
+        "water_curr_read": water.current_reading,
+        "water_curr_date": water.current_date,
+        "water_prev_date": water.previous_date,
+        "water_meter_id": water.watermeter_id,
+        "amt_late_fee": entry.late_fee_accrued_last_month,
+    }
+
+    if (water.current_reading is not None) and (water.previous_reading is not None):
+        parsed["desc_curr_water"] = (
+            f"""Water bill for {
+                parsed['water_prev_date'].strftime("%B")
+            }-"""
+            + f"""Water bill for {
+                parsed['water_curr_date'].strftime("%B %Y")
+            }"""
+        )
+        parsed["date_water"] = statement_date
+        parsed["water_usage_period"] = water.current_reading - water.previous_reading
+    else:
+        parsed["desc_curr_water"] = None
+        parsed["date_water"] = None
+        parsed["water_usage_period"] = None
+
+    if not np.isnan(entry.late_fee_accrued_last_month) and isinstance(
+        entry.late_fee_accrued_last_month, float
+    ):
+        parsed["desc_late_fee"] = "Late fee"
+        parsed["date_late"] = statement_date
+    else:
+        parsed["desc_late_fee"] = None
+        parsed["date_late"] = None
+
+    if not np.isnan(entry.monthly_rent) and isinstance(entry.monthly_rent, float):
+        parsed["desc_curr_rent"] = f"Lot rent for {(statement_date).strftime("%B %Y")}"
+        parsed["date_rent"] = statement_date
+    else:
+        parsed["desc_curr_rent"] = None
+        parsed["date_rent"] = None
+
+    if not np.isnan(entry.monthly_storage) and isinstance(entry.monthly_storage, float):
+        parsed["desc_curr_storage"] = f"""Storage rent for {
+            (statement_date).strftime("%B %Y")
+        }"""
+        parsed["date_storage"] = statement_date
+    else:
+        parsed["desc_curr_storage"] = None
+        parsed["date_storage"] = None
+
+    total_paid_last_month = entry.paid_on_time_last_month + entry.paid_past_due_last_month
+
+    if not np.isnan(total_paid_last_month) and isinstance(total_paid_last_month, float):
+        parsed["desc_prev_month_paid"] = f"""Bill paid for {
+            (statement_date - timedelta(days=28)).strftime("%B %Y")
+        }"""
+        parsed["date_today_1"] = models.et_date_now()
+    else:
+        parsed["desc_prev_month_paid"] = None
+        parsed["date_today_1"] = None
+
+    if (
+        not np.isnan(entry.total_carried_over_last_month)
+        and entry.total_carried_over_last_month > 0
+    ):
+        parsed["desc_prev_month_residual"] = f"""{
+            (statement_date - timedelta(days=28)).strftime("%B")
+        } bill, less paid"""
+        parsed["date_today_2"] = models.et_date_now()
+    else:
+        parsed["desc_prev_month_residual"] = None
+        parsed["date_today_2"] = None
+
+    if not np.isnan(entry.starting_balance) and entry.starting_balance > 0:
+        parsed["desc_prev_overdue"] = "Previous overdue"
+    else:
+        parsed["desc_prev_overdue"] = None
+
+    if not np.isnan(entry.monthly_other) and isinstance(entry.monthly_other, float):
+        parsed["desc_other_rent"] = "Other rent(s)*"
+        parsed["date_other_rent"] = statement_date
+        parsed["detail_other_rent"] = "* Please contact to find out the details"
+    else:
+        parsed["desc_other_rent"] = None
+        parsed["date_other_rent"] = None
+        parsed["detail_other_rent"] = None
+
+    parsed["invoice_date"] = models.et_date_now()
+    parsed["business_name"] = company.business_name
+    parsed["business_address_1"] = company.business_address_1
+    parsed["business_address_2"] = company.business_address_2
+    parsed["business_contact_phone"] = company.business_contact_phone
+    parsed["business_contact_email"] = company.business_contact_email
+    parsed["invoice_due_date"] = statement_date
+    parsed["business_name_"] = company.business_name.upper()
+    parsed["business_address_1_"] = company.business_address_1
+    parsed["business_address_2_"] = company.business_address_2
+    parsed["business_contact_email_"] = f"Or Zelle to {company.business_contact_email}"
+    parsed["invoice_date_"] = parsed["invoice_date"]
+    parsed["invoice_customer_id_"] = parsed["invoice_customer_id"]
+    parsed["invoice_due_date_"] = parsed["invoice_due_date"]
+    parsed["invoice_total_amount_due_"] = parsed["invoice_total_amount_due"]
+
+    # if as_invoice_object:
+    #     return models.Invoice.model_validate(
+    #         {
+    #             "invoice_date": parsed["invoice_date"],
+    #             "statement_date": statement_date,
+    #             "account_id": row[1],
+    #             "lot_id": lot_id,
+    #             "tenant_name": parsed["tenant_name"],
+    #             "setting_id": invoice_setting_id,
+    #             "amount_due": parsed["amt_total_amount_due"],
+    #             "details": parsed,
+    #         }
+    #     )
+
+    return parsed
+
+
+def generate_invoice_from_user_inputs(
+    book: BytesIO,
+    waters: BytesIO,
+    statement_date: date,
+    prop: dict,
+    invoice_setting_id: str | UUID,
+    template_path: str,
+    export_path: str,
+    sheet_name: str | None = None,
+    company: BusinessEntityParams | None = None,
+):
+    if company is None:
+        company = BusinessEntityParams()
+
+    prop = models.Property.model_validate(prop)
+    water_df = ingest_water_meter_readings(waters)
+    water_usages = generate_water_usage_objects(water_df, statement_date, indexed=True)
+
+    book_df = ingest_bookkeeping_excel(book=book, sheet_name=sheet_name)
+    book_dict = book_df.to_dict(orient="index")
+    input_data = [
+        serialize_invoice_input_from_book_ingest(
+            company=company,
+            statement_date=statement_date,
+            property_code=prop.property_code,
+            street_address_base=prop.street_address,
+            csz_address=prop.city_state_zip,
+            entry=models.BookIngest(lot_id=lot_number, **entry),
+            water=water_usages[lot_number],
+            invoice_setting_id=invoice_setting_id,
+        )
+        for lot_number, entry in book_dict.items()
+    ]
+    invoice_parsed = [models.InvoiceFileParse(**i) for i in input_data if i]
+
+    return generate_invoices(
+        template_path=template_path, input_data=invoice_parsed, export_path=export_path
+    )
 
 
 def get_binary_file_downloader_html(bin_file, file_label="File"):

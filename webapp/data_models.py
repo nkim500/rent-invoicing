@@ -299,3 +299,36 @@ class Account(BaseModel):
     @field_serializer("bill_preference")
     def serialize_enum(self, bill_preference: BillPreference, _info):
         return bill_preference.value
+
+
+class BookIngest(BaseModel):
+    lot_id: int
+    tenant_name: str
+    starting_balance: float
+    monthly_due_last_month: float
+    paid_on_time_last_month: float
+    paid_past_due_last_month: float
+    late_fee_accrued_last_month: float
+    total_carried_over_last_month: float
+    ending_balance: float
+    monthly_rent: float
+    monthly_storage: float
+    monthly_water: float
+    monthly_other: float
+    new_charges_this_month: float
+    payment_on_time_1: float
+    payment_on_time_2: float
+    payment_on_time_3: float
+    payment_overdue_1: float
+    payment_overdue_2: float
+    payment_overdue_3: float
+    payment_overdue_4: float
+    late_fee_this_month: float
+    carry_over_to_next_month: float
+
+    @model_validator(mode="after")
+    def zero_out_missing_values(self): ...
+
+    @property
+    def total_amount_due_for_invoice(self):
+        return self.ending_balance + self.new_charges_this_month

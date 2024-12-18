@@ -5,6 +5,7 @@ import data_models as models
 import streamlit as st
 import utils
 from config import AppConfig
+from config import BusinessEntityParams
 from pydantic import ValidationError
 
 app_config = AppConfig()
@@ -534,6 +535,103 @@ def generate_invoices_page():
             )
         except json.JSONDecodeError:
             st.error("There are no invoices for the selected statement date")
+
+
+def generate_invoice_from_book():
+    if "generate_invoices" not in st.session_state:
+        st.session_state.generate_invoices = False
+    if "download_triggered" not in st.session_state:
+        st.session_state.download_triggered = False
+    if "uploaded_water" not in st.session_state:
+        st.session_state.uploaded_water = False
+    if "uploaded_book" not in st.session_state:
+        st.session_state.uploaded_book = False
+    if "sheet_name" not in st.session_state:
+        st.session_state.sheet_name = None
+    if "sheet_name_correct" not in st.session_state:
+        st.session_state.sheet_name_correct = False
+    if "prop" not in st.session_state:
+        st.session_state.prop = None
+    if "override_water" not in st.session_state:
+        st.session_state.override_water = False
+
+    invoice_setting_id = st.session_state.invoice_setting["id"]
+    template_path = app_config.template_path
+    export_path = app_config.output_path
+    company = BusinessEntityParams()
+    statement_date = st.session_state.statement_date
+
+    st.subheader("Generate invoice")
+
+    st.markdown("### Upload bookkeeping file")
+
+    st.session_state.uploaded_book = st.file_uploader(
+        "Upload the bookkeeping file (.xlsx)", type=["xlsx"]
+    )
+    st.session_state.sheet_name = st.text_input(
+        "Enter the name of the bookkeeping worksheet to use for invoicing:",
+        help="If left blank, the last worksheet will be invoiced.",
+        value=None,
+    )
+    if st.session_state.uploaded_book:
+        st.success("Bookkeeping file is uploaded")
+        if st.session_state.sheet_name and len(st.session_state.sheet_name) >= 0:
+            try:
+                utils.ingest_bookkeeping_excel(
+                    st.session_state.uploaded_book, sheet_name=st.session_state.sheet_name
+                )
+                st.session_state.sheet_name_correct = True
+            except Exception as e:
+                print(e)
+                st.error(
+                    f"Sheet name {st.session_state.sheet_name} does not exist. \
+                    If sheet name is left blank, the last worksheet will be invoiced."
+                )
+    else:
+        st.info("Bookkeeping file needs to be uploaded")
+
+    st.markdown("### Upload water report")
+    st.write("Note, current reading month is usually one month before the statement date")
+    st.session_state.uploaded_water = st.file_uploader(
+        "Upload the water report Excel file (.xlsx)", type=["xlsx"]
+    )
+    if st.session_state.uploaded_water:
+        st.success("Water usage report uploaded")
+    else:
+        st.info("Water usage report needs to be uploaded")
+
+    st.session_state.generate_invoices = st.button("Generate invoices")
+    # st.session_state.upload_invoice_to_db = st.checkbox("Update database", value=True)
+
+    if (
+        st.session_state.uploaded_water is not None
+        and st.session_state.uploaded_book is not None
+        and st.session_state.sheet_name is not None
+        and st.session_state.prop
+        and st.session_state.generate_invoices
+    ):
+        utils.clear_directory(export_path)
+
+        try:
+            file_paths = utils.generate_invoice_from_user_inputs(
+                book=st.session_state.uploaded_book,
+                waters=st.session_state.uploaded_water,
+                statement_date=statement_date,
+                prop=st.session_state.prop,
+                invoice_setting_id=invoice_setting_id,
+                template_path=template_path,
+                export_path=export_path,
+                sheet_name=st.session_state.sheet_name,
+                company=company,
+            )
+            st.write(f"Generated {len(file_paths)} invoice(s)")
+            utils.user_download_invoice_zip(export_path)
+        except AssertionError:
+            st.error("Please make sure the worksheet name is correct")
+            st.stop()
+        except Exception as e:
+            st.error(e)
+            st.write("Wunnuheyo")
 
 
 def accounts_management_page():

@@ -134,6 +134,16 @@ def get_invoice_settings() -> list[dict]:
     return json.loads(response.content)
 
 
+def get_properties() -> list[dict]:
+    """GET request to retrieve all registered properties
+
+    Returns:
+        list[dict]: List of properties
+    """
+    response = requests.get(url=f"{host}:{port}/properties/")
+    return json.loads(response.content)
+
+
 def get_monthly_charges(
     invoice_setting_id: str | UUID, statement_date: date, processing_date: date
 ) -> list[dict]:

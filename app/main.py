@@ -1142,3 +1142,18 @@ def get_available_lots(session: Session = Depends(get_session)):
     q = queries.get_available_lots_query()
     available_lots = session.exec(q).all()
     return available_lots
+
+
+@app.get("/properties/")
+def get_properties(session: Session = Depends(get_session)):
+    """Retrieve a list of properties.
+
+    Args:
+        session (Session): Database session dependency.
+
+    Returns:
+        list: Properties.
+    """
+    q = queries.get_properties_query()
+    props = session.exec(q).all()
+    return props
