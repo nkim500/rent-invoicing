@@ -556,9 +556,7 @@ def serialize_invoice_input_from_book_ingest(
             f"""Water bill for {
                 parsed['water_prev_date'].strftime("%B")
             }-"""
-            + f"""Water bill for {
-                parsed['water_curr_date'].strftime("%B %Y")
-            }"""
+            + f"""{parsed['water_curr_date'].strftime("%B %Y")}"""
         )
         parsed["date_water"] = statement_date
         parsed["water_usage_period"] = water.current_reading - water.previous_reading
