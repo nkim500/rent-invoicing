@@ -526,18 +526,35 @@ def serialize_invoice_input_from_book_ingest(
     else:
         tenant_address_2 = ""
 
+    if entry.total_carried_over_last_month >= 0:
+        amt_overdue_prev_mth_w_cred = entry.starting_balance
+    else:
+        amt_overdue_prev_mth_w_cred = (
+            entry.starting_balance + entry.total_carried_over_last_month
+        )
+
+    # if entry.late_fee_accrued_last_month > 0:
+    #     amt_overdue_prev_mth_w_cred = (
+    #         amt_overdue_prev_mth_w_cred - entry.late_fee_accrued_last_month
+    #     )
+
+    prev_mth_total_amount_paid = (
+        entry.paid_on_time_last_month + entry.paid_past_due_last_month
+    )
+
     parsed = {
         "invoice_customer_id": f"{lot_id}",
         "tenant_address_1": tenant_address_1,
         "tenant_address_2": tenant_address_2,
         "tenant_name": entry.tenant_name,
-        "amt_prev_month_paid": (
-            entry.paid_on_time_last_month + entry.paid_past_due_last_month
+        "amt_prev_month_paid": prev_mth_total_amount_paid,
+        "amt_prev_month_residual": max(
+            entry.monthly_due_last_month - prev_mth_total_amount_paid, 0
         ),
-        "amt_prev_month_residual": entry.total_carried_over_last_month,
         "invoice_total_amount_due": entry.total_amount_due_for_invoice,
         "amt_total_amount_due": entry.total_amount_due_for_invoice,
-        "amt_overdue": max(entry.ending_balance, 0),
+        # "amt_overdue": max(entry.starting_balance, 0),
+        "amt_overdue": amt_overdue_prev_mth_w_cred,
         "amt_other_rent": entry.monthly_other,
         "amt_rent": entry.monthly_rent,
         "amt_storage": entry.monthly_storage,
@@ -601,20 +618,30 @@ def serialize_invoice_input_from_book_ingest(
         parsed["desc_prev_month_paid"] = None
         parsed["date_today_1"] = None
 
-    if (
-        not np.isnan(entry.total_carried_over_last_month)
-        and entry.total_carried_over_last_month > 0
-    ):
-        parsed["desc_prev_month_residual"] = f"""{
-            (statement_date - timedelta(days=28)).strftime("%B")
-        } bill, less paid"""
-        parsed["date_today_2"] = models.et_date_now()
-    else:
-        parsed["desc_prev_month_residual"] = None
-        parsed["date_today_2"] = None
+    # if not np.isnan(entry.starting_balance) and entry.starting_balance > 0:
+    #     parsed["desc_prev_overdue"] = "Previous overdue"
+    # else:
+    #     parsed["desc_prev_overdue"] = None
 
-    if not np.isnan(entry.starting_balance) and entry.starting_balance > 0:
-        parsed["desc_prev_overdue"] = "Previous overdue"
+    # if (
+    #     not np.isnan(entry.total_carried_over_last_month)
+    #     and entry.total_carried_over_last_month > 0
+    # ):
+    #     parsed["desc_prev_month_residual"] = f"""{
+    #         (statement_date - timedelta(days=28)).strftime("%B")
+    #     } bill, less paid"""
+    #     parsed["date_today_2"] = models.et_date_now()
+    # else:
+    #     parsed["desc_prev_month_residual"] = None
+    #     parsed["date_today_2"] = None
+
+    parsed["desc_prev_month_residual"] = f"""{
+        (statement_date - timedelta(days=28)).strftime("%B")
+    } bill, less paid"""
+    parsed["date_today_2"] = models.et_date_now()
+
+    if amt_overdue_prev_mth_w_cred:
+        parsed["desc_prev_overdue"] = "Previous overdue (credit)"
     else:
         parsed["desc_prev_overdue"] = None
 
